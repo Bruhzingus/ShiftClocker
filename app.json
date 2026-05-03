@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "ShiftyLog",
+    "slug": "shiftylog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0b1220",
+"android": {
+  "package": "com.shiftylog.app",
+  "versionCode": 1,
+  "adaptiveIcon": { "backgroundColor": "#0b1220" }
+},
+    "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "86c9ff72-6669-435e-9066-2c2478a8a8a8"
+      }
+    },
+    "owner": "bruhzingus"
+  }
+}
