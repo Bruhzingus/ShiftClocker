@@ -13,26 +13,28 @@ import BulkEditModal from './BulkEditModal';
 const W = {
   check: 40,
   date: 96,
-  times: 124,
-  hours: 66,
+  times: 108,
+  hours: 60,
   pay: 80,
+  tips: 70,
   break: 68,
   ot: 68,
   job: 96,
   notes: 220,
 };
 
-function tableWidth(settings, selectionMode, hasJobs) {
+function tableWidth(settings, selectionMode, hasJobs, hasTipsJobs) {
   let w = W.date + W.times + W.hours + W.notes;
   if (selectionMode) w += W.check;
   if (settings.showWage) w += W.pay;
+  if (settings.showWage && hasTipsJobs) w += W.tips;
   if (settings.trackBreaks) w += W.break;
   if (settings.trackOvertime) w += W.ot;
   if (hasJobs) w += W.job;
   return w;
 }
 
-function TableHeader({ settings, selectionMode, allSelected, onSelectAll, hasJobs }) {
+function TableHeader({ settings, selectionMode, allSelected, onSelectAll, hasJobs, hasTipsJobs }) {
   const C = useTheme();
   const s = useStyles(makeStyles);
   return (
@@ -52,13 +54,14 @@ function TableHeader({ settings, selectionMode, allSelected, onSelectAll, hasJob
       {settings.trackBreaks && <Text style={[s.headerCell, { width: W.break }]}>BREAK</Text>}
       {settings.trackOvertime && <Text style={[s.headerCell, { width: W.ot }]}>OT</Text>}
       {settings.showWage && <Text style={[s.headerCell, { width: W.pay }]}>PAY</Text>}
+      {settings.showWage && hasTipsJobs && <Text style={[s.headerCell, { width: W.tips }]}>TIPS</Text>}
       {hasJobs && <Text style={[s.headerCell, { width: W.job }]}>JOB</Text>}
       <Text style={[s.headerCell, { flex: 1, width: W.notes }]}>NOTES</Text>
     </View>
   );
 }
 
-function ShiftRow({ shift, settings, selectionMode, selected, onPress, onLongPress, index, hasJobs }) {
+function ShiftRow({ shift, settings, selectionMode, selected, onPress, onLongPress, index, hasJobs, hasTipsJobs }) {
   const C = useTheme();
   const s = useStyles(makeStyles);
   const [notesExpanded, setNotesExpanded] = useState(false);
@@ -127,6 +130,14 @@ function ShiftRow({ shift, settings, selectionMode, selected, onPress, onLongPre
       {settings.showWage && (
         <View style={[s.cell, { width: W.pay }]}>
           <Text style={s.cellPay}>{formatMoney(c.pay)}</Text>
+        </View>
+      )}
+
+      {settings.showWage && hasTipsJobs && (
+        <View style={[s.cell, { width: W.tips }]}>
+          <Text style={[s.cellSubtle, (Number(shift.tips) || 0) > 0 && s.cellAccent]}>
+            {(Number(shift.tips) || 0) > 0 ? formatMoney(Number(shift.tips)) : '—'}
+          </Text>
         </View>
       )}
 
@@ -268,7 +279,8 @@ export default function ShiftTable({ shifts, settings, onEdit, onDeleteShifts, o
   };
 
   const hasJobs = Array.isArray(settings.jobs) && settings.jobs.length > 0;
-  const tWidth = tableWidth(settings, selectionMode, hasJobs);
+  const hasTipsJobs = Array.isArray(settings.jobs) && settings.jobs.some((j) => j.hasTips);
+  const tWidth = tableWidth(settings, selectionMode, hasJobs, hasTipsJobs);
 
   if (shifts.length === 0) {
     return (
@@ -302,6 +314,7 @@ export default function ShiftTable({ shifts, settings, onEdit, onDeleteShifts, o
             allSelected={allSelected}
             onSelectAll={toggleSelectAll}
             hasJobs={hasJobs}
+            hasTipsJobs={hasTipsJobs}
           />
           <ScrollView
             style={{ flex: 1 }}
@@ -322,6 +335,7 @@ export default function ShiftTable({ shifts, settings, onEdit, onDeleteShifts, o
                   if (!selectionMode) enterSelection(shift.id);
                 }}
                 hasJobs={hasJobs}
+                hasTipsJobs={hasTipsJobs}
               />
             ))}
             <View style={{ height: 24 }} />

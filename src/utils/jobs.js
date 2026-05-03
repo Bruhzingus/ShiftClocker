@@ -38,6 +38,7 @@ export function makeJob({ name, hourlyRate, color }) {
     hourlyRate: Number.isFinite(r) && r >= 0 ? r : 0,
     color: color || JOB_COLORS[0],
     archived: false,
+    hasTips: false,
     createdAt: todayISO(),
   };
 }

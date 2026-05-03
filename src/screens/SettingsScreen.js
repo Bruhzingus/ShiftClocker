@@ -194,6 +194,7 @@ export default function SettingsScreen({
                 <View style={{ flex: 1 }}>
                   <Text style={s.jobName} numberOfLines={1}>
                     {job.name}
+                    {job.hasTips ? ' · tips' : ''}
                     {job.archived ? ' · archived' : ''}
                   </Text>
                   {settings.showWage && (
@@ -426,6 +427,12 @@ function JobEditDialog({ isNew, job, onChange, onSave, onRemove, onCancel, canRe
         })}
       </View>
       <View style={{ height: 12 }} />
+      <Toggle
+        checked={!!job.hasTips}
+        onChange={(v) => onChange({ hasTips: v })}
+        label="Tips enabled"
+        hint="Shows a tips input when logging shifts for this job"
+      />
       <Toggle
         checked={!!job.archived}
         onChange={(v) => onChange({ archived: v })}

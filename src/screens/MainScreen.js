@@ -45,7 +45,7 @@ export default function MainScreen({
         id: uid(), date: today, start: '09:00', end: '17:00',
         hourlyRate: rate, jobId: activeId || null,
         breakMinutes: 30, breakPaid: false,
-        overtimeMinutes: 0, mileageKm: 0, notes: '', tags: [],
+        overtimeMinutes: 0, mileageKm: 0, tips: 0, notes: '', tags: [],
       },
     });
   }, [settings]);
@@ -108,6 +108,7 @@ export default function MainScreen({
       breakMinutes: q.breakMinutes, breakPaid: q.breakPaid,
       overtimeMinutes: q.overtimeMinutes,
       mileageKm: Number(q.mileageKm) || 0,
+      tips: Number(q.tips) || 0,
       notes: q.notes || '',
       tags: q.tags || [],
     };

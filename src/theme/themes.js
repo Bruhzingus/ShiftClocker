@@ -172,29 +172,29 @@ const crimson = {
   overlay: 'rgba(0,0,0,0.75)',
 };
 
-// Ocean — cool deep teal/cyan with bright cyan accents.
+// Ocean — deep indigo sea with warm gold accents (moonlight on water).
 const ocean = {
-  bg: '#04141c',
-  surface: '#0c2230',
-  surfaceHov: '#143042',
-  surfaceAlt: '#081c28',
-  border: '#1d4258',
-  borderFaint: '#13303f',
+  bg: '#040616',
+  surface: '#0a0f28',
+  surfaceHov: '#12183e',
+  surfaceAlt: '#070b1e',
+  border: '#1e2858',
+  borderFaint: '#131c40',
 
-  text: '#ecfeff',
-  textMuted: '#a5f3fc',
-  textSubtle: '#7dc7d4',
-  textFaint: '#5d96a3',
-  textDim: '#3e6470',
+  text: '#f0ecff',
+  textMuted: '#c8bef8',
+  textSubtle: '#8a80c8',
+  textFaint: '#6058a0',
+  textDim: '#403870',
 
-  accent: '#22d3ee',
-  accentBright: '#67e8f9',
-  accentDim: '#a5f3fc',
-  accentDeep: '#0891b2',
-  accentBg: 'rgba(34,211,238,0.12)',
-  accentBgStrong: 'rgba(34,211,238,0.22)',
-  accentBorder: 'rgba(34,211,238,0.32)',
-  accentInk: '#04141c',
+  accent: '#fbbf24',
+  accentBright: '#fcd34d',
+  accentDim: '#fde68a',
+  accentDeep: '#d97706',
+  accentBg: 'rgba(251,191,36,0.12)',
+  accentBgStrong: 'rgba(251,191,36,0.22)',
+  accentBorder: 'rgba(251,191,36,0.32)',
+  accentInk: '#040616',
 
   danger: '#fb7185',
   dangerBg: 'rgba(251,113,133,0.12)',
@@ -203,7 +203,7 @@ const ocean = {
   green: '#34d399',
   greenBg: 'rgba(52,211,153,0.12)',
 
-  overlay: 'rgba(0,4,8,0.75)',
+  overlay: 'rgba(0,0,12,0.78)',
 };
 
 export const THEMES = {
@@ -221,7 +221,7 @@ export const THEME_LIST = [
   { id: 'slate',    name: 'Slate',    description: 'The classic — steel blue on midnight', isLight: false },
   { id: 'midnight', name: 'Midnight', description: 'Near-black with violet accents',        isLight: false },
   { id: 'forest',   name: 'Forest',   description: 'Deep evergreen with sage green',         isLight: false },
-  { id: 'ocean',    name: 'Ocean',    description: 'Cool teal with electric cyan',           isLight: false },
+  { id: 'ocean',    name: 'Ocean',    description: 'Deep indigo sea with warm gold',         isLight: false },
   { id: 'crimson',  name: 'Crimson',  description: 'Moody charcoal with crimson red',        isLight: false },
   { id: 'solar',    name: 'Solar',    description: 'Warm paper with terracotta',             isLight: true  },
 ];

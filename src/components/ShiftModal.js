@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, ScrollView, Pressable, StyleSheet,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
@@ -36,6 +37,8 @@ export default function ShiftModal({ open, initial, isEdit, settings, onSave, on
 
   const activeJobs = getActiveJobs(settings.jobs || []);
   const showJobs = activeJobs.length > 0;
+  const selectedJob = findJob(activeJobs, form.jobId);
+  const jobHasTips = !!(selectedJob?.hasTips);
 
   const onJobChange = (jobId) => {
     const job = findJob(activeJobs, jobId);
@@ -60,6 +63,7 @@ export default function ShiftModal({ open, initial, isEdit, settings, onSave, on
     out.breakMinutes = clampNumber(out.breakMinutes, { max: 24 * 60 });
     out.overtimeMinutes = clampNumber(out.overtimeMinutes, { max: 24 * 60 });
     out.mileageKm = clampNumber(out.mileageKm, { max: 100_000 });
+    out.tips = clampNumber(out.tips ?? 0, { max: 100_000 });
     out.breakPaid = !!out.breakPaid;
     onSave(out);
   };
@@ -75,6 +79,7 @@ export default function ShiftModal({ open, initial, isEdit, settings, onSave, on
           <Btn variant="primary" onPress={save} disabled={!valid} small>Save</Btn>
         </View>
 
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
           {valid && c && (
             <View style={s.preview}>
@@ -119,6 +124,16 @@ export default function ShiftModal({ open, initial, isEdit, settings, onSave, on
               <NumInput
                 value={form.hourlyRate ?? settings.defaultHourlyRate}
                 onChangeText={(v) => set('hourlyRate', v)}
+                placeholder="0.00"
+              />
+            </Field>
+          )}
+
+          {settings.showWage && jobHasTips && (
+            <Field label="Tips earned">
+              <NumInput
+                value={form.tips ?? 0}
+                onChangeText={(v) => set('tips', v)}
                 placeholder="0.00"
               />
             </Field>
@@ -193,6 +208,7 @@ export default function ShiftModal({ open, initial, isEdit, settings, onSave, on
             </Btn>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       </ScreenContainer>
 
       <ConfirmDialog

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, StatusBar, BackHandler } from 'react-native';
+import { ConfirmDialog } from './src/components/common';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAsyncStorage, clearAllStorage } from './src/utils/storage';
 import { seedShifts, seedQuickShifts, DEFAULT_SETTINGS } from './src/utils/helpers';
@@ -19,8 +20,21 @@ export default function App() {
   const [themeId, setThemeId, themeLoaded] = useAsyncStorage('sl.theme.v1', DEFAULT_THEME_ID);
   const [view, setView] = useState('main');
   const [, setReloadKey] = useState(0);
+  const [exitConfirm, setExitConfirm] = useState(false);
 
   const loaded = shiftsLoaded && qsLoaded && stLoaded && sortLoaded && themeLoaded;
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (view === 'settings' || view === 'quickshifts') {
+        setView('main');
+        return true;
+      }
+      setExitConfirm(true);
+      return true;
+    });
+    return () => sub.remove();
+  }, [view]);
 
   // Settings backfill — once on first load, fill in any keys we added in a
   // later version, run the jobs migration, and validate the persisted theme
@@ -168,6 +182,14 @@ export default function App() {
           onOpenQuickShifts={() => setView('quickshifts')}
         />
       )}
+      <ConfirmDialog
+        open={exitConfirm}
+        title="Exit ShiftyLog?"
+        message="Your data is saved automatically."
+        confirmLabel="Exit"
+        onConfirm={() => BackHandler.exitApp()}
+        onCancel={() => setExitConfirm(false)}
+      />
     </ThemeProvider>
   );
 }

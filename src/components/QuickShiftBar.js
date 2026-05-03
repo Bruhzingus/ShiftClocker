@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, ScrollView, Pressable, StyleSheet,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
@@ -18,6 +19,7 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
   const [date, setDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [mileageKm, setMileageKm] = useState('0');
+  const [tips, setTips] = useState('0');
   const [breakMinutes, setBreakMinutes] = useState(String(quickShift?.breakMinutes || 0));
   const [breakPaid, setBreakPaid] = useState(!!(quickShift?.breakPaid));
   const [jobId, setJobId] = useState(defaultJob?.id || '');
@@ -50,6 +52,7 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
     jobId,
     hourlyRate: rate,
     mileageKm: Number(mileageKm) || 0,
+    tips: Number(tips) || 0,
     breakMinutes: Number(breakMinutes) || 0,
     breakPaid,
   };
@@ -61,6 +64,7 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
     setDate(todayISO());
     setNotes('');
     setMileageKm('0');
+    setTips('0');
     setBreakMinutes(String(quickShift.breakMinutes || 0));
     setBreakPaid(!!(quickShift.breakPaid));
     onClose();
@@ -68,7 +72,10 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
 
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={m.overlay}>
+      <KeyboardAvoidingView
+        style={m.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Pressable style={m.backdrop} onPress={onClose} />
         <View style={m.sheet}>
           <View style={m.handle} />
@@ -121,6 +128,20 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
               </>
             )}
 
+            {settings.showWage && job?.hasTips && (
+              <>
+                <View style={{ height: 12 }} />
+                <Field label="Tips earned">
+                  <StyledInput
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    value={tips}
+                    onChangeText={setTips}
+                  />
+                </Field>
+              </>
+            )}
+
             <View style={{ height: 12 }} />
 
             <Field label="Notes" hint="optional">
@@ -167,7 +188,7 @@ function QuickShiftConfirmModal({ open, quickShift, settings, defaultJob, onAdd,
             <View style={{ height: 24 }} />
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -299,7 +320,7 @@ const makeBarStyles = (C) => StyleSheet.create({
 });
 
 const makeModalStyles = (C) => StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end', paddingBottom: Platform.OS === 'android' ? 28 : 0 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: C.overlay },
   sheet: {
     backgroundColor: C.surface,

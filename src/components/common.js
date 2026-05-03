@@ -177,6 +177,17 @@ export function DateField({ label, value, onChange }) {
 
 // ─── Time field ──────────────────────────────────────────────────────────────
 
+function formatTime12h(hm) {
+  if (!hm) return '--:--';
+  const [hStr, mStr] = hm.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return hm;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 export function TimeField({ label, value, onChange }) {
   const s = useStyles(makeStyles);
   const [show, setShow] = useState(false);
@@ -185,14 +196,14 @@ export function TimeField({ label, value, onChange }) {
     <Field label={label}>
       <Pressable onPress={() => setShow(true)} style={s.input}>
         <Text style={value ? s.inputText : s.inputPlaceholder}>
-          {value || '--:--'}
+          {value ? formatTime12h(value) : '--:--'}
         </Text>
       </Pressable>
       {show && (
         <DateTimePicker
           value={timeFromHM(value)}
           mode="time"
-          is24Hour
+          is24Hour={false}
           display="default"
           onChange={(e, date) => {
             setShow(false);
