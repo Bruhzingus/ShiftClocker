@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, ActivityIndicator, StyleSheet, StatusBar, BackHandler } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ConfirmDialog } from './src/components/common';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAsyncStorage, clearAllStorage } from './src/utils/storage';
@@ -10,13 +11,12 @@ import { THEMES, DEFAULT_THEME_ID } from './src/theme/themes';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import MainScreen from './src/screens/MainScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import QuickShiftsScreen from './src/screens/QuickShiftsScreen';
 
 export default function App() {
   const [shifts, setShifts, shiftsLoaded] = useAsyncStorage('sl.shifts.v1', seedShifts);
   const [quickShifts, setQuickShifts, qsLoaded] = useAsyncStorage('sl.quickshifts.v1', seedQuickShifts);
   const [settings, setSettings, stLoaded] = useAsyncStorage('sl.settings.v1', DEFAULT_SETTINGS);
-  const [sortBy, setSortBy, sortLoaded] = useAsyncStorage('sl.sort.v1', 'date-desc');
+  const [sortBy, setSortBy, sortLoaded] = useAsyncStorage('sl.sort.v1', 'date-asc');
   const [themeId, setThemeId, themeLoaded] = useAsyncStorage('sl.theme.v1', DEFAULT_THEME_ID);
   const [view, setView] = useState('main');
   const [, setReloadKey] = useState(0);
@@ -26,7 +26,7 @@ export default function App() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (view === 'settings' || view === 'quickshifts') {
+      if (view === 'settings') {
         setView('main');
         return true;
       }
@@ -146,51 +146,43 @@ export default function App() {
   const isLight = themeId === 'solar';
 
   return (
-    <ThemeProvider themeId={themeId}>
-      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={palette.bg} translucent={false} />
-      {view === 'settings' ? (
-        <SettingsScreen
-          settings={settings}
-          setSettings={setSettings}
-          shifts={shifts}
-          setShifts={setShifts}
-          quickShifts={quickShifts}
-          setQuickShifts={setQuickShifts}
-          themeId={themeId}
-          setThemeId={setThemeId}
-          onBack={() => setView('main')}
-          onResetAll={resetAll}
-          onAfterRestore={reloadFromStorage}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider themeId={themeId}>
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={palette.bg} translucent={false} />
+        {view === 'settings' ? (
+          <SettingsScreen
+            settings={settings}
+            setSettings={setSettings}
+            shifts={shifts}
+            setShifts={setShifts}
+            quickShifts={quickShifts}
+            setQuickShifts={setQuickShifts}
+            themeId={themeId}
+            setThemeId={setThemeId}
+            onBack={() => setView('main')}
+            onResetAll={resetAll}
+            onAfterRestore={reloadFromStorage}
+          />
+        ) : (
+          <MainScreen
+            shifts={shifts}
+            setShifts={setShifts}
+            quickShifts={quickShifts}
+            settings={settings}
+            setSettings={setSettings}
+            onOpenSettings={() => setView('settings')}
+          />
+        )}
+        <ConfirmDialog
+          open={exitConfirm}
+          title="Exit ShiftyLog?"
+          message="Your data is saved automatically."
+          confirmLabel="Exit"
+          onConfirm={() => BackHandler.exitApp()}
+          onCancel={() => setExitConfirm(false)}
         />
-      ) : view === 'quickshifts' ? (
-        <QuickShiftsScreen
-          quickShifts={quickShifts}
-          setQuickShifts={setQuickShifts}
-          settings={settings}
-          onBack={() => setView('main')}
-        />
-      ) : (
-        <MainScreen
-          shifts={shifts}
-          setShifts={setShifts}
-          quickShifts={quickShifts}
-          settings={settings}
-          setSettings={setSettings}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-          onOpenSettings={() => setView('settings')}
-          onOpenQuickShifts={() => setView('quickshifts')}
-        />
-      )}
-      <ConfirmDialog
-        open={exitConfirm}
-        title="Exit ShiftyLog?"
-        message="Your data is saved automatically."
-        confirmLabel="Exit"
-        onConfirm={() => BackHandler.exitApp()}
-        onCancel={() => setExitConfirm(false)}
-      />
-    </ThemeProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

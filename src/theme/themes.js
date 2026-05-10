@@ -1,7 +1,8 @@
-// 5 modernized themes. The "slate" palette is the original ShiftyLog look
-// (kept identical to the previous src/theme/colors.js so existing screenshots
-// and muscle memory still match). Adding a new theme = duplicate one of these
-// objects and tweak the values; every UI surface renders from these tokens.
+// Theme palettes. Each palette is a flat object of color tokens consumed by
+// every themed component via useTheme(). Adding a theme = add a palette here,
+// list it in THEMES and THEME_LIST — no other changes needed.
+
+// ─── Existing themes ──────────────────────────────────────────────────────────
 
 const slate = {
   bg: '#0b1220',
@@ -10,13 +11,11 @@ const slate = {
   surfaceAlt: '#101a2c',
   border: '#243653',
   borderFaint: '#1a273d',
-
   text: '#f1f5f9',
   textMuted: '#cbd5e1',
   textSubtle: '#94a3b8',
   textFaint: '#64748b',
   textDim: '#475569',
-
   accent: '#60a5fa',
   accentBright: '#93c5fd',
   accentDim: '#bfdbfe',
@@ -25,18 +24,14 @@ const slate = {
   accentBgStrong: 'rgba(96,165,250,0.22)',
   accentBorder: 'rgba(96,165,250,0.32)',
   accentInk: '#0b1220',
-
   danger: '#f87171',
   dangerBg: 'rgba(248,113,113,0.12)',
   dangerBorder: 'rgba(248,113,113,0.32)',
-
   green: '#34d399',
   greenBg: 'rgba(52,211,153,0.12)',
-
   overlay: 'rgba(2,6,15,0.7)',
 };
 
-// Deep, near-black with a violet accent — premium / minimal vibe.
 const midnight = {
   bg: '#0a0a12',
   surface: '#15151f',
@@ -44,13 +39,11 @@ const midnight = {
   surfaceAlt: '#101019',
   border: '#2a2a3a',
   borderFaint: '#1c1c28',
-
   text: '#f5f5fa',
   textMuted: '#d0d0d8',
   textSubtle: '#9090a4',
   textFaint: '#65657a',
   textDim: '#454556',
-
   accent: '#a78bfa',
   accentBright: '#c4b5fd',
   accentDim: '#ddd6fe',
@@ -59,18 +52,14 @@ const midnight = {
   accentBgStrong: 'rgba(167,139,250,0.22)',
   accentBorder: 'rgba(167,139,250,0.32)',
   accentInk: '#0a0a12',
-
   danger: '#fb7185',
   dangerBg: 'rgba(251,113,133,0.12)',
   dangerBorder: 'rgba(251,113,133,0.32)',
-
   green: '#4ade80',
   greenBg: 'rgba(74,222,128,0.12)',
-
   overlay: 'rgba(0,0,4,0.75)',
 };
 
-// Forest — deep teal/green with a warm sage accent.
 const forest = {
   bg: '#0a1410',
   surface: '#13201a',
@@ -78,13 +67,11 @@ const forest = {
   surfaceAlt: '#0f1a14',
   border: '#234231',
   borderFaint: '#1a2c22',
-
   text: '#ecfdf5',
   textMuted: '#bbf7d0',
   textSubtle: '#86d4a3',
   textFaint: '#5e9476',
   textDim: '#3f6953',
-
   accent: '#4ade80',
   accentBright: '#86efac',
   accentDim: '#bbf7d0',
@@ -93,18 +80,14 @@ const forest = {
   accentBgStrong: 'rgba(74,222,128,0.22)',
   accentBorder: 'rgba(74,222,128,0.32)',
   accentInk: '#0a1410',
-
   danger: '#fb7185',
   dangerBg: 'rgba(251,113,133,0.12)',
   dangerBorder: 'rgba(251,113,133,0.32)',
-
   green: '#4ade80',
   greenBg: 'rgba(74,222,128,0.12)',
-
   overlay: 'rgba(0,8,4,0.7)',
 };
 
-// Solar — warm cream paper with terracotta accents (the only light theme).
 const solar = {
   bg: '#fbf7f0',
   surface: '#ffffff',
@@ -112,13 +95,11 @@ const solar = {
   surfaceAlt: '#f8f3e8',
   border: '#e0d6c2',
   borderFaint: '#ece4d3',
-
   text: '#1c1917',
   textMuted: '#3f3a36',
   textSubtle: '#6b6259',
   textFaint: '#8b8278',
   textDim: '#a8a097',
-
   accent: '#dc6b3a',
   accentBright: '#c2410c',
   accentDim: '#9a3412',
@@ -127,52 +108,44 @@ const solar = {
   accentBgStrong: 'rgba(220,107,58,0.22)',
   accentBorder: 'rgba(220,107,58,0.32)',
   accentInk: '#ffffff',
-
   danger: '#dc2626',
   dangerBg: 'rgba(220,38,38,0.10)',
   dangerBorder: 'rgba(220,38,38,0.30)',
-
   green: '#059669',
   greenBg: 'rgba(5,150,105,0.10)',
-
   overlay: 'rgba(28,25,23,0.45)',
 };
 
-// Crimson — moody charcoal with red accents.
+// Crimson — cool near-black with a deep navy bias; accent is vivid neon-red.
+// Cold + hot contrast gives a "blood neon" feel distinct from the old warm-red version.
 const crimson = {
-  bg: '#100a0d',
-  surface: '#1c1418',
-  surfaceHov: '#291c22',
-  surfaceAlt: '#160f12',
-  border: '#3a242c',
-  borderFaint: '#26181d',
-
-  text: '#fef2f2',
-  textMuted: '#fecaca',
-  textSubtle: '#a89096',
-  textFaint: '#7a6168',
-  textDim: '#534148',
-
-  accent: '#ef4444',
-  accentBright: '#f87171',
-  accentDim: '#fca5a5',
-  accentDeep: '#b91c1c',
-  accentBg: 'rgba(239,68,68,0.12)',
-  accentBgStrong: 'rgba(239,68,68,0.22)',
-  accentBorder: 'rgba(239,68,68,0.34)',
-  accentInk: '#100a0d',
-
+  bg: '#06080f',
+  surface: '#0e1422',
+  surfaceHov: '#162034',
+  surfaceAlt: '#0a0e1a',
+  border: '#1e2e4a',
+  borderFaint: '#131e32',
+  text: '#fff0f2',
+  textMuted: '#ffc8d0',
+  textSubtle: '#d06878',
+  textFaint: '#904050',
+  textDim: '#602838',
+  accent: '#ff1a44',
+  accentBright: '#ff5470',
+  accentDim: '#ff9aaa',
+  accentDeep: '#cc0030',
+  accentBg: 'rgba(255,26,68,0.13)',
+  accentBgStrong: 'rgba(255,26,68,0.24)',
+  accentBorder: 'rgba(255,26,68,0.36)',
+  accentInk: '#06080f',
   danger: '#fb923c',
   dangerBg: 'rgba(251,146,60,0.12)',
   dangerBorder: 'rgba(251,146,60,0.32)',
-
   green: '#34d399',
   greenBg: 'rgba(52,211,153,0.12)',
-
-  overlay: 'rgba(0,0,0,0.75)',
+  overlay: 'rgba(0,2,8,0.82)',
 };
 
-// Ocean — deep indigo sea with warm gold accents (moonlight on water).
 const ocean = {
   bg: '#040616',
   surface: '#0a0f28',
@@ -180,13 +153,11 @@ const ocean = {
   surfaceAlt: '#070b1e',
   border: '#1e2858',
   borderFaint: '#131c40',
-
   text: '#f0ecff',
   textMuted: '#c8bef8',
   textSubtle: '#8a80c8',
   textFaint: '#6058a0',
   textDim: '#403870',
-
   accent: '#fbbf24',
   accentBright: '#fcd34d',
   accentDim: '#fde68a',
@@ -195,35 +166,155 @@ const ocean = {
   accentBgStrong: 'rgba(251,191,36,0.22)',
   accentBorder: 'rgba(251,191,36,0.32)',
   accentInk: '#040616',
-
   danger: '#fb7185',
   dangerBg: 'rgba(251,113,133,0.12)',
   dangerBorder: 'rgba(251,113,133,0.32)',
-
   green: '#34d399',
   greenBg: 'rgba(52,211,153,0.12)',
-
   overlay: 'rgba(0,0,12,0.78)',
 };
 
-export const THEMES = {
-  slate,
-  midnight,
-  forest,
-  solar,
-  crimson,
-  ocean,
+// ─── New themes ───────────────────────────────────────────────────────────────
+
+// Ash — pure monochrome. No colour bias; surfaces and text are all neutral
+// grey. The silver accent is the only departure from greyscale.
+const ash = {
+  bg: '#0d0d0e',
+  surface: '#1a1a1c',
+  surfaceHov: '#262628',
+  surfaceAlt: '#131314',
+  border: '#363638',
+  borderFaint: '#232325',
+  text: '#f2f2f4',
+  textMuted: '#d4d4d8',
+  textSubtle: '#a0a0a6',
+  textFaint: '#6e6e74',
+  textDim: '#4a4a50',
+  accent: '#c8c8ce',        // silver
+  accentBright: '#e0e0e6',
+  accentDim: '#f0f0f4',
+  accentDeep: '#909096',
+  accentBg: 'rgba(200,200,206,0.10)',
+  accentBgStrong: 'rgba(200,200,206,0.18)',
+  accentBorder: 'rgba(200,200,206,0.26)',
+  accentInk: '#0d0d0e',
+  danger: '#f87171',
+  dangerBg: 'rgba(248,113,113,0.12)',
+  dangerBorder: 'rgba(248,113,113,0.30)',
+  green: '#86efac',
+  greenBg: 'rgba(134,239,172,0.12)',
+  overlay: 'rgba(0,0,0,0.84)',
 };
 
-// Display order + metadata for the theme picker. `slate` first because it's
-// the default; `solar` flagged as light so the picker can show a sun icon.
+// Aurora — dark emerald base that transitions to fuchsia accents, evoking the
+// colour bands of northern lights sweeping across a cold sky.
+const aurora = {
+  bg: '#040e0a',            // deep dark emerald-black
+  surface: '#0a1c14',       // dark forest green
+  surfaceHov: '#122a1e',
+  surfaceAlt: '#07140e',
+  border: '#1c3828',
+  borderFaint: '#102018',
+  text: '#f0fdf8',
+  textMuted: '#a7f3d0',
+  textSubtle: '#6ee7b7',
+  textFaint: '#34d399',
+  textDim: '#10b981',
+  accent: '#e879f9',        // fuchsia — contrasts the green base for aurora effect
+  accentBright: '#f0abfc',
+  accentDim: '#f5d0fe',
+  accentDeep: '#c026d3',
+  accentBg: 'rgba(232,121,249,0.12)',
+  accentBgStrong: 'rgba(232,121,249,0.22)',
+  accentBorder: 'rgba(232,121,249,0.32)',
+  accentInk: '#040e0a',
+  danger: '#fb7185',
+  dangerBg: 'rgba(251,113,133,0.12)',
+  dangerBorder: 'rgba(251,113,133,0.32)',
+  green: '#34d399',
+  greenBg: 'rgba(52,211,153,0.12)',
+  overlay: 'rgba(0,5,2,0.82)',
+};
+
+// Blaze — near-black backgrounds with zero warm bias; accent is vivid gold/amber.
+// The high-contrast gold against pure dark gives a sunburst or forge-fire feel
+// that reads very differently from the old warm-charcoal+orange version.
+const blaze = {
+  bg: '#09080a',
+  surface: '#161220',
+  surfaceHov: '#211c30',
+  surfaceAlt: '#110e18',
+  border: '#342c4a',
+  borderFaint: '#221a30',
+  text: '#fffae8',
+  textMuted: '#ffe8a0',
+  textSubtle: '#c8a830',
+  textFaint: '#886810',
+  textDim: '#504008',
+  accent: '#ffc200',        // vivid gold
+  accentBright: '#ffd740',
+  accentDim: '#ffe880',
+  accentDeep: '#e0a000',
+  accentBg: 'rgba(255,194,0,0.13)',
+  accentBgStrong: 'rgba(255,194,0,0.24)',
+  accentBorder: 'rgba(255,194,0,0.36)',
+  accentInk: '#09080a',
+  danger: '#f87171',
+  dangerBg: 'rgba(248,113,113,0.12)',
+  dangerBorder: 'rgba(248,113,113,0.32)',
+  green: '#4ade80',
+  greenBg: 'rgba(74,222,128,0.12)',
+  overlay: 'rgba(2,1,4,0.84)',
+};
+
+// Horizon — deep midnight indigo surfaces shifting toward a rose/coral accent,
+// like the last glow above the horizon at dusk.
+const horizon = {
+  bg: '#07061a',            // very dark blue-indigo
+  surface: '#0f0e34',
+  surfaceHov: '#181648',
+  surfaceAlt: '#0b0a26',
+  border: '#28265c',
+  borderFaint: '#1a183e',
+  text: '#fef0ff',
+  textMuted: '#e8c8f8',
+  textSubtle: '#b890d8',
+  textFaint: '#8060a8',
+  textDim: '#583c78',
+  accent: '#f43f5e',        // rose — warm against the cold indigo
+  accentBright: '#fb7185',
+  accentDim: '#fda4af',
+  accentDeep: '#e11d48',
+  accentBg: 'rgba(244,63,94,0.12)',
+  accentBgStrong: 'rgba(244,63,94,0.22)',
+  accentBorder: 'rgba(244,63,94,0.34)',
+  accentInk: '#07061a',
+  danger: '#fb923c',
+  dangerBg: 'rgba(251,146,60,0.12)',
+  dangerBorder: 'rgba(251,146,60,0.32)',
+  green: '#34d399',
+  greenBg: 'rgba(52,211,153,0.12)',
+  overlay: 'rgba(2,2,12,0.84)',
+};
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+export const THEMES = {
+  slate, midnight, forest, solar, crimson, ocean,
+  ash, aurora, blaze, horizon,
+};
+
 export const THEME_LIST = [
-  { id: 'slate',    name: 'Slate',    description: 'The classic — steel blue on midnight', isLight: false },
-  { id: 'midnight', name: 'Midnight', description: 'Near-black with violet accents',        isLight: false },
-  { id: 'forest',   name: 'Forest',   description: 'Deep evergreen with sage green',         isLight: false },
-  { id: 'ocean',    name: 'Ocean',    description: 'Deep indigo sea with warm gold',         isLight: false },
-  { id: 'crimson',  name: 'Crimson',  description: 'Moody charcoal with crimson red',        isLight: false },
-  { id: 'solar',    name: 'Solar',    description: 'Warm paper with terracotta',             isLight: true  },
+  { id: 'slate',    name: 'Slate',    isLight: false },
+  { id: 'midnight', name: 'Midnight', isLight: false },
+  { id: 'forest',   name: 'Forest',   isLight: false },
+  { id: 'ocean',    name: 'Ocean',    isLight: false },
+  { id: 'crimson',  name: 'Crimson',  isLight: false },
+  { id: 'solar',    name: 'Solar',    isLight: true  },
+  { id: 'ash',      name: 'Ash',      isLight: false },
+  { id: 'aurora',   name: 'Aurora',   isLight: false },
+  { id: 'blaze',    name: 'Blaze',    isLight: false },
+  { id: 'horizon',  name: 'Horizon',  isLight: false },
 ];
 
 export const DEFAULT_THEME_ID = 'slate';

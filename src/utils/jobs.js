@@ -40,7 +40,22 @@ export function makeJob({ name, hourlyRate, color }) {
     archived: false,
     hasTips: false,
     createdAt: todayISO(),
+    // Each entry: { id, effectiveDate (ISO), rate (number), note? }
+    rateHistory: [],
   };
+}
+
+// Returns the effective hourly rate for a job as of a given ISO date.
+// Falls back to job.hourlyRate if raises are not enabled or no history applies.
+export function getJobEffectiveRate(job, asOfDate, settings) {
+  if (!job) return 0;
+  if (settings?.enableRaises && Array.isArray(job.rateHistory) && job.rateHistory.length) {
+    const applicable = job.rateHistory
+      .filter((r) => r.effectiveDate <= asOfDate)
+      .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+    if (applicable.length) return Number(applicable[0].rate) || 0;
+  }
+  return Number(job.hourlyRate) || 0;
 }
 
 // Migration entry point: returns { jobs, lastUsedJobId } given the prior

@@ -4,7 +4,8 @@
       "Bash(*)",
       "PowerShell(*)",
       "Edit",
-      "Write"
+      "Write",
+      "WebFetch(domain:docs.expo.dev)"
     ]
   }
 }

@@ -1,14 +1,54 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, Modal, Pressable, StyleSheet, Alert, Animated, Easing } from 'react-native';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import {
+  View, Text, Modal, Pressable, StyleSheet, Alert,
+  Animated, Easing, ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
+import { DateField } from './common';
 import { exportCSV, exportPDF } from '../utils/export';
+import { computePeriodRange } from '../utils/periods';
+import { formatDateLong } from '../utils/helpers';
 
-function MenuItem({ icon, title, subtitle, onPress }) {
+// ─── Period scopes ────────────────────────────────────────────────────────────
+
+const SCOPES = [
+  { id: 'view',      label: 'Current view' },
+  { id: 'all',       label: 'All time' },
+  { id: 'week',      label: 'This week' },
+  { id: 'payperiod', label: 'Pay period' },
+  { id: 'month',     label: 'This month' },
+  { id: 'year',      label: 'This year' },
+  { id: 'custom',    label: 'Custom dates' },
+];
+
+function getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo) {
+  if (scope === 'view')   return viewShifts;
+  if (scope === 'all')    return allShifts;
+  if (scope === 'custom') {
+    return allShifts.filter((sh) => {
+      if (customFrom && sh.date < customFrom) return false;
+      if (customTo   && sh.date > customTo)   return false;
+      return true;
+    });
+  }
+  const range = computePeriodRange(scope, 0, settings);
+  if (!range) return allShifts;
+  return allShifts.filter((sh) => sh.date >= range.dateFrom && sh.date <= range.dateTo);
+}
+
+// ─── Menu item ────────────────────────────────────────────────────────────────
+
+function MenuItem({ icon, title, subtitle, onPress, disabled }) {
   const C = useTheme();
   const m = useStyles(makeStyles);
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [m.item, pressed && m.itemPressed]} accessibilityRole="button">
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [m.item, pressed && m.itemPressed, disabled && { opacity: 0.4 }]}
+      accessibilityRole="button"
+    >
       <Ionicons name={icon} size={20} color={C.textSubtle} />
       <View>
         <Text style={m.itemTitle}>{title}</Text>
@@ -18,10 +58,16 @@ function MenuItem({ icon, title, subtitle, onPress }) {
   );
 }
 
-export default function ExportMenu({ open, shifts, settings, summaryText, dateRangeText, onClose }) {
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function ExportMenu({ open, viewShifts, allShifts, settings, onClose }) {
+  const C = useTheme();
   const m = useStyles(makeStyles);
-  const opacity = useRef(new Animated.Value(0)).current;
+  const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
+  const [scope, setScope]           = useState('view');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo,   setCustomTo]   = useState('');
 
   useEffect(() => {
     Animated.parallel([
@@ -36,14 +82,39 @@ export default function ExportMenu({ open, shifts, settings, summaryText, dateRa
     ]).start();
   }, [open]);
 
+  // Reset scope each time the menu opens
+  useEffect(() => {
+    if (open) { setScope('view'); setCustomFrom(''); setCustomTo(''); }
+  }, [open]);
+
+  const exportShifts = useMemo(
+    () => getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo),
+    [scope, viewShifts, allShifts, settings, customFrom, customTo],
+  );
+
+  const countLabel = useMemo(() => {
+    const n = exportShifts.length;
+    if (n === 0) return 'No shifts in this range';
+    const dates = exportShifts.map((s) => s.date).sort();
+    const lo = formatDateLong(dates[0]);
+    const hi = formatDateLong(dates[dates.length - 1]);
+    const span = dates[0] === dates[dates.length - 1] ? lo : `${lo} – ${hi}`;
+    return `${n} shift${n !== 1 ? 's' : ''} · ${span}`;
+  }, [exportShifts]);
+
   const tryExport = async (fn) => {
-    try {
-      await fn();
-    } catch (e) {
-      Alert.alert('Export failed', e.message);
-    }
+    try { await fn(); }
+    catch (e) { Alert.alert('Export failed', e.message); }
     onClose();
   };
+
+  const summaryForPDF = `${exportShifts.length} shift${exportShifts.length !== 1 ? 's' : ''}`;
+  const dateRangeForPDF = exportShifts.length > 0
+    ? (() => {
+        const dates = exportShifts.map((s) => s.date).sort();
+        return `${formatDateLong(dates[0])} — ${formatDateLong(dates[dates.length - 1])}`;
+      })()
+    : '';
 
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose}>
@@ -51,19 +122,71 @@ export default function ExportMenu({ open, shifts, settings, summaryText, dateRa
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
         <Animated.View style={[m.menuWrap, { transform: [{ translateY }] }]}>
           <Pressable style={m.menu} onPress={() => {}}>
+            {/* Title */}
             <Text style={m.menuTitle}>Export</Text>
             <View style={m.divider} />
+
+            {/* Period scope selector */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={m.scopeRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {SCOPES.map((sc) => {
+                const active = scope === sc.id;
+                return (
+                  <Pressable
+                    key={sc.id}
+                    onPress={() => setScope(sc.id)}
+                    style={({ pressed }) => [
+                      m.scopeChip,
+                      active && m.scopeChipActive,
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <Text style={[m.scopeLabel, active && m.scopeLabelActive]}>
+                      {sc.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Custom date pickers — shown only when "Custom dates" is selected */}
+            {scope === 'custom' && (
+              <View style={m.customDateRow}>
+                <View style={{ flex: 1 }}>
+                  <DateField label="From" value={customFrom} onChange={setCustomFrom} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <DateField label="To" value={customTo} onChange={setCustomTo} />
+                </View>
+              </View>
+            )}
+
+            {/* Count badge */}
+            <View style={m.countRow}>
+              <Ionicons name="calendar-outline" size={13} color={C.textFaint} />
+              <Text style={m.countText} numberOfLines={1}>{countLabel}</Text>
+            </View>
+
+            <View style={m.divider} />
+
+            {/* Export formats */}
             <MenuItem
               icon="document-text-outline"
               title="Export CSV"
               subtitle="For spreadsheets"
-              onPress={() => tryExport(() => exportCSV(shifts, settings))}
+              disabled={exportShifts.length === 0}
+              onPress={() => tryExport(() => exportCSV(exportShifts, settings))}
             />
             <MenuItem
               icon="print-outline"
               title="Export PDF"
               subtitle="Printable report"
-              onPress={() => tryExport(() => exportPDF(shifts, settings, summaryText, dateRangeText))}
+              disabled={exportShifts.length === 0}
+              onPress={() => tryExport(() => exportPDF(exportShifts, settings, summaryForPDF, dateRangeForPDF))}
             />
           </Pressable>
         </Animated.View>
@@ -94,6 +217,48 @@ const makeStyles = (C) => StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
   },
   divider: { height: 1, backgroundColor: C.borderFaint, marginHorizontal: 16 },
+
+  // Scope chips
+  scopeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  scopeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
+  },
+  scopeChipActive: {
+    backgroundColor: C.accentBg,
+    borderColor: C.accentBorder,
+  },
+  scopeLabel: { fontSize: 12, fontWeight: '600', color: C.textFaint },
+  scopeLabelActive: { color: C.accentBright },
+
+  // Custom date picker row
+  customDateRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+
+  // Count row
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  countText: { fontSize: 12, color: C.textFaint, flex: 1 },
+
+  // Format items
   item: {
     flexDirection: 'row',
     alignItems: 'center',

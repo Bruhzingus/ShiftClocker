@@ -5,21 +5,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
 import { DateField } from './common';
-import Dropdown from './Dropdown';
 
-const SORT_OPTIONS = [
-  { label: 'Date — newest first', value: 'date-desc' },
-  { label: 'Date — oldest first', value: 'date-asc' },
-  { label: 'Hours — most first', value: 'hours-desc' },
-  { label: 'Pay — highest first', value: 'pay-desc' },
-];
-
+// Simplified: search on top, date filter below. Sort removed (column headers handle it).
 export default function FilterBar({
   search, setSearch,
   dateFrom, setDateFrom,
   dateTo, setDateTo,
-  sortBy, setSortBy,
   onClear,
+  periodActive,
 }) {
   const C = useTheme();
   const s = useStyles(makeStyles);
@@ -30,7 +23,7 @@ export default function FilterBar({
   useEffect(() => {
     Animated.timing(expand, {
       toValue: dateOpen ? 1 : 0,
-      duration: 220,
+      duration: 200,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
@@ -38,6 +31,7 @@ export default function FilterBar({
 
   return (
     <View style={s.wrap}>
+      {/* Search row */}
       <View style={s.row}>
         <View style={s.searchWrap}>
           <Ionicons name="search-outline" size={16} color={C.textFaint} />
@@ -50,61 +44,55 @@ export default function FilterBar({
             accessibilityLabel="Search shifts"
           />
           {search ? (
-            <Pressable onPress={() => setSearch('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+            <Pressable onPress={() => setSearch('')} hitSlop={8} accessibilityRole="button">
               <Ionicons name="close-circle" size={16} color={C.textFaint} />
             </Pressable>
           ) : null}
         </View>
 
-        <Dropdown
-          value={sortBy}
-          options={SORT_OPTIONS}
-          onChange={setSortBy}
-          compact
-          style={s.sortWrap}
-          triggerStyle={s.sortTrigger}
-        />
+        {!periodActive && (
+          <Pressable
+            onPress={() => setDateOpen((o) => !o)}
+            style={({ pressed }) => [
+              s.calBtn,
+              (dateOpen || dateFrom || dateTo) && s.calBtnActive,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle date filter"
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={(dateOpen || dateFrom || dateTo) ? C.accent : C.textSubtle}
+            />
+          </Pressable>
+        )}
 
-        <Pressable
-          onPress={() => setDateOpen((o) => !o)}
-          accessibilityRole="button"
-          accessibilityLabel="Toggle date filter"
-          accessibilityState={{ expanded: dateOpen }}
-          style={({ pressed }) => [
-            s.calBtn,
-            (dateOpen || dateFrom || dateTo) && s.calBtnActive,
-            pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] },
-          ]}
-        >
-          <Ionicons
-            name="calendar-outline"
-            size={20}
-            color={(dateOpen || dateFrom || dateTo) ? C.accent : C.textSubtle}
-          />
-        </Pressable>
+        {hasFilter && (
+          <Pressable onPress={onClear} style={s.clearBtn} accessibilityRole="button">
+            <Text style={s.clearText}>Clear</Text>
+          </Pressable>
+        )}
       </View>
 
-      <Animated.View
-        style={{
-          maxHeight: expand.interpolate({ inputRange: [0, 1], outputRange: [0, 120] }),
+      {/* Date filter (expands below search) */}
+      {!periodActive && (
+        <Animated.View style={{
+          maxHeight: expand.interpolate({ inputRange: [0, 1], outputRange: [0, 110] }),
           opacity: expand,
           overflow: 'hidden',
-        }}
-      >
-        <View style={s.dateRow}>
-          <View style={{ flex: 1 }}>
-            <DateField label="From" value={dateFrom} onChange={setDateFrom} />
+        }}>
+          <View style={s.dateRow}>
+            <View style={{ flex: 1 }}>
+              <DateField label="From" value={dateFrom} onChange={setDateFrom} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <DateField label="To" value={dateTo} onChange={setDateTo} />
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <DateField label="To" value={dateTo} onChange={setDateTo} />
-          </View>
-          {hasFilter && (
-            <Pressable onPress={onClear} style={s.clearBtn} accessibilityRole="button">
-              <Text style={s.clearText}>Clear</Text>
-            </Pressable>
-          )}
-        </View>
-      </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -136,36 +124,19 @@ const makeStyles = (C) => StyleSheet.create({
     gap: 6,
   },
   searchInput: {
-    flex: 1,
-    color: C.text,
-    fontSize: 14,
-    height: 40,
-    paddingVertical: 0,
-  },
-  sortWrap: {
-    width: 130,
-  },
-  sortTrigger: {
-    height: 40,
-    paddingHorizontal: 10,
+    flex: 1, color: C.text, fontSize: 14, height: 40, paddingVertical: 0,
   },
   calBtn: {
     width: 40, height: 40,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.border,
+    backgroundColor: C.surfaceAlt, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border,
   },
   calBtnActive: { borderColor: C.accentBorder, backgroundColor: C.accentBg },
-
+  clearBtn: { paddingHorizontal: 6, paddingVertical: 8 },
+  clearText: { fontSize: 12, color: C.accent, fontWeight: '600' },
   dateRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-    alignItems: 'flex-end',
+    flexDirection: 'row', gap: 8,
+    paddingHorizontal: 8, paddingBottom: 10, paddingTop: 2,
   },
-  clearBtn: { paddingVertical: 8, paddingHorizontal: 4 },
-  clearText: { fontSize: 13, color: C.accent, fontWeight: '600' },
 });

@@ -89,34 +89,108 @@ export function clampNumber(v, { min = 0, max = 1_000_000 } = {}) {
 }
 
 export function seedShifts() {
-  const ago = (n) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return isoFromDate(d);
-  };
   return [
+    // ── Week 3 (May 4–8) ─────────────────────────────────────────────────────
     {
-      id: uid(), date: todayISO(), start: '09:00', end: '17:30',
-      hourlyRate: 25, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
-      mileageKm: 12, notes: 'Welcome to ShiftyLog! Long-press any row to enter multi-select mode. Tap a row to edit. Use the Quick Shift bar above to add a shift with pre-filled settings.', tags: ['onboarding'],
+      id: uid(), date: '2026-05-08', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 14, tips: 0, tags: [],
+      notes: 'Attended morning meeting and Trailed Jingcheng and Raj. We were focused on catching Raj up to speed with everything he missed during his vacation. We went to troubleshoot a computer issue at a feedlot, where we confirmed that the issue was not related to anything we service (internet, PC, switch). It was a software issue caused by the power interruptions. We called the software company, and fixed the issue. Spent the rest of the day testing conference room equipment.',
     },
     {
-      id: uid(), date: ago(1), start: '08:00', end: '16:00',
-      hourlyRate: 25, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
-      mileageKm: 8, notes: 'Trained the new hire on POS system. Slow afternoon — reorganized back stock.', tags: ['training'],
+      id: uid(), date: '2026-05-07', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Attended morning meeting and trailed Jingcheng. Remotely troubleshooted a computer that has a monitor off, it was simply because the user was not logged in. Setup 9 Dell workstations for a new office, by using Windows Configuration Designer to install some programs and settings with MSI files, then by installing manually the following; Acrobat, Chrome + changing Windows settings, and BIOS settings. Did all required security and Windows updates.',
     },
     {
-      id: uid(), date: ago(2), start: '14:00', end: '22:30',
-      hourlyRate: 25, breakMinutes: 45, breakPaid: false, overtimeMinutes: 60,
-      mileageKm: 8, notes: 'Closing shift. Stayed an hour late to cover for Alex. Cash-out balanced.', tags: ['closing'],
+      id: uid(), date: '2026-05-06', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Attended meeting and trailed Jingcheng. Setup DNS for a server using Unify, and then went to a client to migrate everyone from temporary local accounts to active directory. This included preparing each user by resetting their password, creating shared mailboxes, creating new emails, downloading any saved browser passwords, and then using profwiz to transfer their accounts. Trained new users on their updated accounts. Went to a new site that has a camera down, opened up the box to find out there is no power, informed client then left to go home.',
+    },
+    {
+      id: uid(), date: '2026-05-05', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Attended morning meeting, trailed Jingcheng. Troubleshooted an issue with a client\'s data drive remotely. Went to an office and installed Microsoft Outlook, and taught them how to use their new emails. Did email forwarding and transferring of old data.',
+    },
+    {
+      id: uid(), date: '2026-05-04', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Attended morning meeting, discussed what how to handle HDMI from client PCs to local TVs. Because of security concerns and wireless interference, we decided to look into integrating HDMI extenders that have loopback and are able to be used with cat5e and over long distances. Took down a unused NAS and recovered the working hard drives to put in the other NAS to ensure that it has 5 good drives. Tested 8 hard drives and 2 SSDs and documented if they worked. Troubleshooted Network switch being off in the IT office, no idea why it wouldn\'t work with the specific power adapter, but switching it seemed to fix the issue.',
+    },
+
+    // ── Week 2 (Apr 27–May 1) ────────────────────────────────────────────────
+    {
+      id: uid(), date: '2026-05-01', start: '08:00', end: '17:00',
+      hourlyRate: 0, breakMinutes: 45, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 22, tips: 0, tags: [],
+      notes: 'Site visit to install a new managed switch and re-patch the server room. Labelled all ports. Tested connectivity across all VLANs after the reconfigure. Long drive out to the rural site.',
+    },
+    {
+      id: uid(), date: '2026-04-30', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Completed imaging of 6 replacement laptops using our deployment USB. Enrolled devices in Intune and assigned profiles. Verified apps pushed correctly. Handed two units off to reception.',
+    },
+    {
+      id: uid(), date: '2026-04-29', start: '08:30', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 30,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Stayed late to assist with a firewall migration. Backed up existing config, applied new ruleset, tested VPN tunnels. A few rules had to be tweaked to restore access to the print server.',
+    },
+    {
+      id: uid(), date: '2026-04-28', start: '09:00', end: '17:00',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 8, tips: 0, tags: [],
+      notes: 'Responded to a ticket about slow internet at a branch office. Found one of the ISP routers had defaulted its MTU after a power cycle. Reset MTU to 1500, speeds restored. Drove over to confirm on-site.',
+    },
+    {
+      id: uid(), date: '2026-04-27', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Morning standup then documentation work — updated the network diagram for two client sites. Ran cable tracing in the server room to label unlabelled drops. Lunch with the team.',
+    },
+
+    // ── Week 1 (Apr 20–24) ───────────────────────────────────────────────────
+    {
+      id: uid(), date: '2026-04-24', start: '08:00', end: '16:00',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Short day — left a bit early. Spent most of the morning working on helpdesk queue. Resolved 4 tickets: printer offline (driver reinstall), email sync issue, VPN client update, and a password reset.',
+    },
+    {
+      id: uid(), date: '2026-04-23', start: '08:00', end: '17:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 60,
+      mileageKm: 31, tips: 0, tags: [],
+      notes: 'Long day — drove out to a client whose file server ran out of disk space overnight. Moved archive data to an external NAS, freed up ~400 GB. Set up a storage report alert for the future. Overtime approved.',
+    },
+    {
+      id: uid(), date: '2026-04-22', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Worked on onboarding checklist for a new hire starting next month. Created AD account, assigned licences, configured MFA. Set up their workstation profile and tested remote access.',
+    },
+    {
+      id: uid(), date: '2026-04-21', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 0, tips: 0, tags: [],
+      notes: 'Patch Tuesday follow-up — reviewed WSUS report and pushed deferred updates to 12 remaining machines. Two machines had update failures requiring manual intervention (KB conflict, disk full).',
+    },
+    {
+      id: uid(), date: '2026-04-20', start: '08:00', end: '16:30',
+      hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0,
+      mileageKm: 12, tips: 0, tags: [],
+      notes: 'First day of the week. Morning meeting, then drove to a client to replace a dead UPS unit in their server room. Tested the new unit under load. Updated the asset register.',
     },
   ];
 }
 
 export function seedQuickShifts() {
   return [
-    { id: uid(), name: 'Day 8h', start: '09:00', end: '17:30', hourlyRate: 25, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0, tags: [] },
-    { id: uid(), name: 'Night 12h', start: '18:00', end: '06:00', hourlyRate: 28, breakMinutes: 60, breakPaid: true, overtimeMinutes: 0, tags: ['night'] },
+    { id: uid(), name: 'Regular 8h', start: '08:00', end: '16:30', hourlyRate: 0, breakMinutes: 30, breakPaid: false, overtimeMinutes: 0, tags: [] },
   ];
 }
 
@@ -140,4 +214,16 @@ export const DEFAULT_SETTINGS = {
   // the auto-backup hook entirely (manual export still works).
   backupFrequency: 'quarter',
   lastBackupAt: null,
+
+  // Pay period configuration used by the Period tab bar.
+  payPeriod: {
+    type: 'biweekly',
+    startDate: null,
+    customDays: 14,
+    weekStartDay: '1', // '0'=Sun, '1'=Mon
+  },
+
+  // Raise / wage-change history. When enabled, each job tracks rateHistory
+  // and pay is computed from the effective rate on the shift's date.
+  enableRaises: false,
 };

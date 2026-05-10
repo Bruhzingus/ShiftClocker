@@ -4,13 +4,17 @@
     "slug": "shiftylog",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0b1220",
-"android": {
-  "package": "com.shiftylog.app",
-  "versionCode": 1,
-  "adaptiveIcon": { "backgroundColor": "#0b1220" }
-},
+    "android": {
+      "package": "com.shiftylog.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1220"
+      }
+    },
     "newArchEnabled": true,
     "extra": {
       "eas": {
