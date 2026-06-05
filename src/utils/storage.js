@@ -39,5 +39,6 @@ export async function clearAllStorage() {
     'sl.settings.v1',
     'sl.sort.v1',
     'sl.theme.v1',
+    'sl.activeClock.v1',
   ]);
 }

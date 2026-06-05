@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useStyles } from '../theme/ThemeContext';
 import { computeShift } from '../utils/calculations';
 import { formatHM, formatMoney } from '../utils/helpers';
+import { AnimatedCount } from './Animated';
 
 export default function SummaryBar({ shifts, settings }) {
   const s = useStyles(makeStyles);
@@ -21,11 +22,11 @@ export default function SummaryBar({ shifts, settings }) {
     <View style={s.bar}>
       <Text style={s.count}>{shifts.length} shift{shifts.length !== 1 ? 's' : ''}</Text>
       <Text style={s.dot}>·</Text>
-      <Text style={s.hours}>{formatHM(totals.mins)}</Text>
+      <AnimatedCount value={totals.mins} format={(n) => formatHM(Math.round(n))} style={s.hours} />
       {settings.showWage && (
         <>
           <Text style={s.dot}>·</Text>
-          <Text style={s.pay}>{formatMoney(totals.pay)}</Text>
+          <AnimatedCount value={totals.pay} format={(n) => formatMoney(n)} style={s.pay} />
         </>
       )}
       {settings.trackMileage && totals.km > 0 && (

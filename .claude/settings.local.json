@@ -5,7 +5,8 @@
       "PowerShell(*)",
       "Edit",
       "Write",
-      "WebFetch(domain:docs.expo.dev)"
+      "WebFetch(domain:docs.expo.dev)",
+      "WebSearch"
     ]
   }
 }

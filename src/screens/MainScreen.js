@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
 import ScreenContainer from '../components/ScreenContainer';
@@ -7,6 +8,9 @@ import { FadeIn } from '../components/Animated';
 import ShiftTable from '../components/ShiftTable';
 import ShiftModal from '../components/ShiftModal';
 import QuickShiftBar from '../components/QuickShiftBar';
+import ClockBar from '../components/ClockBar';
+import CalendarView from '../components/CalendarView';
+import DaySheet from '../components/DaySheet';
 import FilterBar from '../components/FilterBar';
 import PeriodBar from '../components/PeriodBar';
 import SummaryBar from '../components/SummaryBar';
@@ -15,17 +19,21 @@ import { computeShift } from '../utils/calculations';
 import { uid, todayISO, formatDateLong, formatHM, formatMoney } from '../utils/helpers';
 import { findJob, defaultJobId, getJobEffectiveRate } from '../utils/jobs';
 import { computePeriodRange } from '../utils/periods';
+import { tapLight, tapMedium } from '../utils/haptics';
 
 export default function MainScreen({
   shifts, setShifts,
   quickShifts,
   settings, setSettings,
-  onOpenSettings,
+  activeClock, setActiveClock,
+  onOpenSettings, onOpenStats,
 }) {
   const C = useTheme();
   const s = useStyles(makeStyles);
   const [modal, setModal] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
+  const [daySheet, setDaySheet] = useState(null);    // ISO date or null
   const [search, setSearch] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -62,10 +70,50 @@ export default function MainScreen({
     setModal({ open: true, isEdit: true, shift: { ...shift } });
   }, []);
 
+  // New shift prefilled to a specific calendar day.
+  const openNewForDay = useCallback((dateISO) => {
+    const jobs = settings.jobs || [];
+    const activeId = defaultJobId(jobs, settings.lastUsedJobId);
+    const job = findJob(jobs, activeId);
+    const rate = job
+      ? getJobEffectiveRate(job, dateISO, settings)
+      : Number(settings.defaultHourlyRate) || 0;
+    setDaySheet(null);
+    setModal({
+      open: true, isEdit: false,
+      shift: {
+        id: uid(), date: dateISO, start: '08:00', end: '16:30',
+        hourlyRate: rate, jobId: activeId || null,
+        breakMinutes: 30, breakPaid: false,
+        overtimeMinutes: 0, mileageKm: 0, tips: 0, notes: '', tags: [],
+      },
+    });
+  }, [settings]);
+
+  // Clock-out → open the New Shift modal prefilled from the live timer.
+  const openClockOut = useCallback((prefill) => {
+    const jobs = settings.jobs || [];
+    const job = findJob(jobs, prefill.jobId);
+    const rate = job
+      ? getJobEffectiveRate(job, todayISO(), settings)
+      : Number(settings.defaultHourlyRate) || 0;
+    setModal({
+      open: true, isEdit: false,
+      shift: {
+        id: uid(), date: todayISO(),
+        start: prefill.start, end: prefill.end,
+        hourlyRate: rate, jobId: prefill.jobId || null,
+        breakMinutes: prefill.breakMinutes || 0, breakPaid: false,
+        overtimeMinutes: 0, mileageKm: 0, tips: 0, notes: '', tags: [],
+      },
+    });
+  }, [settings]);
+
   const saveShift = (sh) => {
+    tapLight();
     setShifts((prev) => {
       const exists = prev.find((x) => x.id === sh.id);
-      return exists ? prev.map((x) => (x.id === sh.id ? sh : x)) : [sh, ...prev];
+      return exists ? prev.map((x) => (x.id === sh.id ? sh : x)) : [...prev, sh];
     });
     if (sh.jobId && sh.jobId !== settings.lastUsedJobId) {
       setSettings((prev) => ({ ...prev, lastUsedJobId: sh.jobId }));
@@ -74,11 +122,13 @@ export default function MainScreen({
   };
 
   const deleteShift = (id) => {
+    tapMedium();
     setShifts((prev) => prev.filter((x) => x.id !== id));
     setModal(null);
   };
 
   const deleteShifts = (ids) => {
+    tapMedium();
     const idSet = new Set(ids);
     setShifts((prev) => prev.filter((x) => !idSet.has(x.id)));
   };
@@ -114,7 +164,8 @@ export default function MainScreen({
       tips: Number(q.tips) || 0,
       notes: q.notes || '', tags: q.tags || [],
     };
-    setShifts((prev) => [shift, ...prev]);
+    tapLight();
+    setShifts((prev) => [...prev, shift]);
     if (q.jobId && q.jobId !== settings.lastUsedJobId) {
       setSettings((prev) => ({ ...prev, lastUsedJobId: q.jobId }));
     }
@@ -177,12 +228,24 @@ export default function MainScreen({
       {/* Header */}
       <View style={s.header}>
         <View style={s.headerTitle}>
-          <Text style={s.appName}>ShiftyLog</Text>
-          <View style={s.badge}><Text style={s.badgeText}>v1</Text></View>
+          <Text style={s.appName}>ShiftClocker</Text>
+          <View style={s.badge}>
+            <Text style={s.badgeText}>v{Constants.expoConfig?.version || '2.0.0'}</Text>
+          </View>
         </View>
         <View style={s.headerActions}>
           <Pressable
+            onPress={onOpenStats}
+            accessibilityRole="button"
+            accessibilityLabel="Statistics"
+            style={({ pressed }) => [s.headerBtn, pressed && s.headerBtnPressed]}
+          >
+            <Ionicons name="stats-chart-outline" size={20} color={C.textSubtle} />
+          </Pressable>
+          <Pressable
             onPress={() => setExportOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Export shifts"
             style={({ pressed }) => [s.headerPill, pressed && s.headerPillPressed]}
           >
             <Ionicons name="download-outline" size={16} color={C.textSubtle} />
@@ -190,6 +253,8 @@ export default function MainScreen({
           </Pressable>
           <Pressable
             onPress={onOpenSettings}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
             style={({ pressed }) => [s.headerBtn, pressed && s.headerBtnPressed]}
           >
             <Ionicons name="settings-outline" size={22} color={C.textSubtle} />
@@ -200,44 +265,85 @@ export default function MainScreen({
       {/* Top section */}
       <View style={s.topSection}>
         <FadeIn delay={0}>
-          <QuickShiftBar
-            quickShifts={quickShifts}
+          <ClockBar
+            activeClock={activeClock}
+            setActiveClock={setActiveClock}
             settings={settings}
-            onAdd={addQuickShift}
-            onNewShift={openNew}
+            onClockOut={openClockOut}
           />
         </FadeIn>
-        <FadeIn delay={40}>
-          <PeriodBar
-            period={period}
-            onPeriodChange={setPeriod}
-            offset={periodOffset}
-            onOffsetChange={setPeriodOffset}
-            periodRange={periodRange}
-          />
+        <FadeIn delay={30}>
+          <View style={s.toggleRow}>
+            {['list', 'calendar'].map((m) => {
+              const on = viewMode === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => setViewMode(m)}
+                  style={[s.toggleBtn, on && s.toggleBtnOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                >
+                  <Ionicons
+                    name={m === 'list' ? 'list-outline' : 'calendar-outline'}
+                    size={15}
+                    color={on ? C.accentBright : C.textFaint}
+                  />
+                  <Text style={[s.toggleText, on && s.toggleTextOn]}>
+                    {m === 'list' ? 'List' : 'Calendar'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </FadeIn>
-        <FadeIn delay={80}>
-          <FilterBar
-            search={search} setSearch={setSearch}
-            dateFrom={filterDateFrom} setDateFrom={setFilterDateFrom}
-            dateTo={filterDateTo}   setDateTo={setFilterDateTo}
-            onClear={() => { setSearch(''); setFilterDateFrom(''); setFilterDateTo(''); }}
-            periodActive={period !== 'all'}
-          />
-        </FadeIn>
-        <FadeIn delay={110}>
-          <SummaryBar shifts={filtered} settings={settings} />
-        </FadeIn>
+        {viewMode === 'list' && (
+          <>
+            <FadeIn delay={40}>
+              <QuickShiftBar
+                quickShifts={quickShifts}
+                settings={settings}
+                onAdd={addQuickShift}
+                onNewShift={openNew}
+              />
+            </FadeIn>
+            <FadeIn delay={60}>
+              <PeriodBar
+                period={period}
+                onPeriodChange={setPeriod}
+                offset={periodOffset}
+                onOffsetChange={setPeriodOffset}
+                periodRange={periodRange}
+              />
+            </FadeIn>
+            <FadeIn delay={80}>
+              <FilterBar
+                search={search} setSearch={setSearch}
+                dateFrom={filterDateFrom} setDateFrom={setFilterDateFrom}
+                dateTo={filterDateTo}   setDateTo={setFilterDateTo}
+                onClear={() => { setSearch(''); setFilterDateFrom(''); setFilterDateTo(''); }}
+                periodActive={period !== 'all'}
+              />
+            </FadeIn>
+            <FadeIn delay={110}>
+              <SummaryBar shifts={filtered} settings={settings} />
+            </FadeIn>
+          </>
+        )}
       </View>
 
-      {/* Table */}
+      {/* Main area: calendar, empty state, or table */}
       <View style={s.tableWrap}>
-        {shifts.length === 0 ? (
+        {viewMode === 'calendar' ? (
+          <FadeIn delay={120} style={{ flex: 1 }}>
+            <CalendarView shifts={shifts} settings={settings} onSelectDay={setDaySheet} />
+          </FadeIn>
+        ) : shifts.length === 0 ? (
           <FadeIn delay={160} style={{ flex: 1 }}>
             <View style={s.emptyFull}>
               <Ionicons name="time-outline" size={38} color={C.textDim} />
               <Text style={s.emptyTitle}>No shifts yet</Text>
-              <Text style={s.emptyHint}>Tap "New" in the bar above to add your first shift.</Text>
+              <Text style={s.emptyHint}>Clock in above, or tap "New" to add your first shift.</Text>
             </View>
           </FadeIn>
         ) : (
@@ -277,6 +383,17 @@ export default function MainScreen({
         settings={settings}
         onClose={() => setExportOpen(false)}
       />
+
+      {daySheet && (
+        <DaySheet
+          dateISO={daySheet}
+          shifts={shifts}
+          settings={settings}
+          onEdit={(sh) => { setDaySheet(null); openEdit(sh); }}
+          onAddForDay={openNewForDay}
+          onClose={() => setDaySheet(null)}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -309,6 +426,18 @@ const makeStyles = (C) => StyleSheet.create({
   },
   headerBtnPressed: { backgroundColor: C.surfaceHov, opacity: 0.85 },
   topSection: { gap: 8, padding: 12 },
+  toggleRow: {
+    flexDirection: 'row', gap: 6,
+    backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.borderFaint,
+    padding: 4,
+  },
+  toggleBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: 'transparent',
+  },
+  toggleBtnOn: { backgroundColor: C.accentBg, borderColor: C.accentBorder },
+  toggleText: { fontSize: 13, fontWeight: '600', color: C.textFaint },
+  toggleTextOn: { color: C.accentBright },
   tableWrap: { flex: 1, overflow: 'hidden' },
   emptyFull: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 6 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: C.textMuted, marginTop: 8 },

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
-import { DateField } from './common';
+import { DateField, NumInput } from './common';
 import { exportCSV, exportPDF } from '../utils/export';
 import { computePeriodRange } from '../utils/periods';
 import { formatDateLong } from '../utils/helpers';
@@ -15,6 +15,7 @@ import { formatDateLong } from '../utils/helpers';
 const SCOPES = [
   { id: 'view',      label: 'Current view' },
   { id: 'all',       label: 'All time' },
+  { id: 'lastN',     label: 'Last N shifts' },
   { id: 'week',      label: 'This week' },
   { id: 'payperiod', label: 'Pay period' },
   { id: 'month',     label: 'This month' },
@@ -22,9 +23,18 @@ const SCOPES = [
   { id: 'custom',    label: 'Custom dates' },
 ];
 
-function getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo) {
+function getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo, lastN) {
   if (scope === 'view')   return viewShifts;
   if (scope === 'all')    return allShifts;
+  if (scope === 'lastN') {
+    const n = Math.max(0, parseInt(lastN, 10) || 0);
+    if (n === 0) return [];
+    // Pick the most-recent N by date (export.js will re-sort ASC)
+    const desc = [...allShifts].sort((a, b) =>
+      (b.date + ' ' + (b.start || '')).localeCompare(a.date + ' ' + (a.start || ''))
+    );
+    return desc.slice(0, n);
+  }
   if (scope === 'custom') {
     return allShifts.filter((sh) => {
       if (customFrom && sh.date < customFrom) return false;
@@ -68,6 +78,7 @@ export default function ExportMenu({ open, viewShifts, allShifts, settings, onCl
   const [scope, setScope]           = useState('view');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo,   setCustomTo]   = useState('');
+  const [lastN,      setLastN]      = useState('20');
 
   useEffect(() => {
     Animated.parallel([
@@ -84,12 +95,12 @@ export default function ExportMenu({ open, viewShifts, allShifts, settings, onCl
 
   // Reset scope each time the menu opens
   useEffect(() => {
-    if (open) { setScope('view'); setCustomFrom(''); setCustomTo(''); }
+    if (open) { setScope('view'); setCustomFrom(''); setCustomTo(''); setLastN('20'); }
   }, [open]);
 
   const exportShifts = useMemo(
-    () => getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo),
-    [scope, viewShifts, allShifts, settings, customFrom, customTo],
+    () => getExportShifts(scope, viewShifts, allShifts, settings, customFrom, customTo, lastN),
+    [scope, viewShifts, allShifts, settings, customFrom, customTo, lastN],
   );
 
   const countLabel = useMemo(() => {
@@ -108,6 +119,7 @@ export default function ExportMenu({ open, viewShifts, allShifts, settings, onCl
     onClose();
   };
 
+  const scopeLabel = SCOPES.find((sc) => sc.id === scope)?.label || '';
   const summaryForPDF = `${exportShifts.length} shift${exportShifts.length !== 1 ? 's' : ''}`;
   const dateRangeForPDF = exportShifts.length > 0
     ? (() => {
@@ -165,6 +177,16 @@ export default function ExportMenu({ open, viewShifts, allShifts, settings, onCl
               </View>
             )}
 
+            {/* Last N number input — shown only when "Last N shifts" is selected */}
+            {scope === 'lastN' && (
+              <View style={m.lastNRow}>
+                <Text style={m.lastNLabel}>How many most-recent shifts?</Text>
+                <View style={m.lastNInput}>
+                  <NumInput value={lastN} onChangeText={setLastN} placeholder="20" />
+                </View>
+              </View>
+            )}
+
             {/* Count badge */}
             <View style={m.countRow}>
               <Ionicons name="calendar-outline" size={13} color={C.textFaint} />
@@ -179,14 +201,14 @@ export default function ExportMenu({ open, viewShifts, allShifts, settings, onCl
               title="Export CSV"
               subtitle="For spreadsheets"
               disabled={exportShifts.length === 0}
-              onPress={() => tryExport(() => exportCSV(exportShifts, settings))}
+              onPress={() => tryExport(() => exportCSV(exportShifts, settings, scopeLabel))}
             />
             <MenuItem
               icon="print-outline"
               title="Export PDF"
               subtitle="Printable report"
               disabled={exportShifts.length === 0}
-              onPress={() => tryExport(() => exportPDF(exportShifts, settings, summaryForPDF, dateRangeForPDF))}
+              onPress={() => tryExport(() => exportPDF(exportShifts, settings, summaryForPDF, dateRangeForPDF, scopeLabel))}
             />
           </Pressable>
         </Animated.View>
@@ -247,6 +269,17 @@ const makeStyles = (C) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 10,
   },
+
+  // Last-N input row
+  lastNRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  lastNLabel: { flex: 1, fontSize: 13, color: C.textSubtle },
+  lastNInput: { width: 100 },
 
   // Count row
   countRow: {

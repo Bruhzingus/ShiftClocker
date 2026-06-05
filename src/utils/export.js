@@ -16,9 +16,43 @@ function csvEscape(v) {
   return s;
 }
 
+// Always export shifts in ascending date+start order so the file reads
+// chronologically regardless of the order they were entered/imported.
+function sortByDateAsc(shifts) {
+  return [...shifts].sort((a, b) =>
+    (a.date + ' ' + (a.start || '')).localeCompare(b.date + ' ' + (b.start || ''))
+  );
+}
+
+// ─── Friendly export filenames ──────────────────────────────────────────────
+// Produces e.g. "This Week Shifts 2026-06-05.csv" or, when a report name is set
+// in Settings, "Jordan - This Week Shifts 2026-06-05.csv". Strips characters
+// that are illegal in filenames on Android/iOS/Windows.
+
+function sanitizeFilename(s) {
+  return String(s || '')
+    .replace(/[\\/:*?"<>|]/g, '') // illegal filename chars
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function buildExportFilename(settings, scopeLabel, ext) {
+  const name  = sanitizeFilename(settings?.reportName);
+  const scope = sanitizeFilename(scopeLabel) || 'Shifts';
+  const base  = `${name ? `${name} - ` : ''}${scope} Shifts ${todayISO()}`;
+  return `${base}.${ext}`;
+}
+
+// Full path in the document dir. Spaces are fine here — expo-file-system writes
+// the literal filename, so the shared file keeps its readable name.
+function docPath(filename) {
+  return `${FileSystem.documentDirectory}${filename}`;
+}
+
 // ─── CSV export ───────────────────────────────────────────────────────────────
 
-export async function exportCSV(shifts, settings) {
+export async function exportCSV(rawShifts, settings, scopeLabel = '') {
+  const shifts = sortByDateAsc(rawShifts);
   const cols = ['Date', 'Start', 'End', 'Paid Hours'];
   if (settings.trackBreaks)   cols.push('Break (min)', 'Break Paid');
   if (settings.trackOvertime) cols.push('Overtime (min)');
@@ -41,14 +75,16 @@ export async function exportCSV(shifts, settings) {
   }
 
   const csv = rows.join('\r\n');
-  const path = `${FileSystem.documentDirectory}worklog-${todayISO()}.csv`;
+  const path = docPath(buildExportFilename(settings, scopeLabel, 'csv'));
   await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
   await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Export CSV' });
 }
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
-export async function exportPDF(shifts, settings, summaryText = '', dateRangeText = '') {
+export async function exportPDF(rawShifts, settings, summaryText = '', dateRangeText = '', scopeLabel = '') {
+  const shifts = sortByDateAsc(rawShifts);
+
   const headCols = ['Date', 'Times', 'Hours'];
   if (settings.trackBreaks)   headCols.push('Break');
   if (settings.trackOvertime) headCols.push('OT');
@@ -59,8 +95,25 @@ export async function exportPDF(shifts, settings, summaryText = '', dateRangeTex
   const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const headerHtml = headCols.map((c) => `<th>${esc(c)}</th>`).join('');
 
+  // Walk shifts once: build rows AND accumulate totals
+  let totalPaidMinutes = 0;
+  let totalRegularMinutes = 0;
+  let totalOTMinutes = 0;
+  let totalPay = 0;
+  let totalTips = 0;
+  let totalMileage = 0;
+  let totalBreakMinutes = 0;
+
   const bodyHtml = shifts.map((s) => {
     const c = computeShift(s, settings);
+    totalPaidMinutes    += c.paidMinutes;
+    totalRegularMinutes += Math.round(c.regularHours * 60);
+    totalOTMinutes      += Number(s.overtimeMinutes) || 0;
+    totalPay            += c.pay;
+    totalTips           += Number(s.tips) || 0;
+    totalMileage        += Number(s.mileageKm) || 0;
+    totalBreakMinutes   += Number(s.breakMinutes) || 0;
+
     const cells = [formatDateShort(s.date), `${s.start}–${s.end}`, formatHM(c.paidMinutes)];
     if (settings.trackBreaks)   cells.push(`${s.breakMinutes || 0}m${s.breakPaid ? ' (paid)' : ''}`);
     if (settings.trackOvertime) cells.push(formatHM(Number(s.overtimeMinutes) || 0));
@@ -70,23 +123,74 @@ export async function exportPDF(shifts, settings, summaryText = '', dateRangeTex
     return `<tr>${cells.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`;
   }).join('');
 
+  // Build the totals/report section
+  const totalsRows = [];
+  const addRow = (label, value) =>
+    totalsRows.push(`<tr><td class="lbl">${esc(label)}</td><td class="val">${esc(value)}</td></tr>`);
+
+  addRow('Total shifts', String(shifts.length));
+  addRow('Total hours', `${formatHM(totalPaidMinutes)}  (${decimalHours(totalPaidMinutes).toFixed(2)} hrs)`);
+  if (settings.trackBreaks && totalBreakMinutes > 0) {
+    addRow('Total break time', formatHM(totalBreakMinutes));
+  }
+  if (settings.trackOvertime && totalOTMinutes > 0) {
+    addRow('Regular hours', formatHM(totalRegularMinutes));
+    addRow('Overtime hours', formatHM(totalOTMinutes));
+  }
+  if (settings.showWage) {
+    addRow('Total pay', formatMoney(totalPay));
+    if (totalTips > 0) addRow('Total tips', formatMoney(totalTips));
+    if (shifts.length > 0) {
+      addRow('Average pay / shift', formatMoney(totalPay / shifts.length));
+    }
+  }
+  if (settings.trackMileage && totalMileage > 0) {
+    addRow('Total mileage', `${totalMileage.toFixed(1)} km`);
+  }
+  if (shifts.length > 0) {
+    addRow('Average shift length', formatHM(Math.round(totalPaidMinutes / shifts.length)));
+  }
+
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <style>
   body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#111}
-  h1{font-size:18px;margin-bottom:4px}
+  h1{font-size:20px;margin-bottom:2px;letter-spacing:-0.3px}
+  .reportName{font-size:13px;font-weight:600;color:#333;margin-bottom:4px}
   .sub{color:#666;font-size:10px;margin-bottom:16px}
   table{width:100%;border-collapse:collapse}
   th{background:#18181b;color:#fff;padding:8px 6px;text-align:left;font-size:10px}
   td{padding:6px;border-bottom:1px solid #eee;vertical-align:top;word-break:break-word}
   tr:nth-child(even) td{background:#f8f8f8}
+  .totals{margin-top:24px;page-break-inside:avoid}
+  .totals h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px;color:#444;border-bottom:2px solid #18181b;padding-bottom:4px}
+  .totals table{width:auto;min-width:280px;max-width:60%}
+  .totals td{padding:5px 14px 5px 0;border-bottom:1px solid #eee;font-size:11px;background:#fff !important}
+  .totals tr:nth-child(even) td{background:#fff !important}
+  .totals td.lbl{color:#555}
+  .totals td.val{color:#111;font-weight:600;text-align:right;white-space:nowrap}
 </style></head><body>
-<h1>ShiftyLog</h1>
+<h1>ShiftClocker</h1>
+${settings.reportName ? `<div class="reportName">${esc(settings.reportName)}</div>` : ''}
 <div class="sub">${esc(dateRangeText)}<br/>${esc(summaryText)}</div>
 <table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>
+
+<div class="totals">
+  <h2>Summary</h2>
+  <table>${totalsRows.join('')}</table>
+</div>
 </body></html>`;
 
+  // printToFileAsync writes to a random temp name; copy it to a friendly name so
+  // the share sheet shows e.g. "This Week Shifts 2026-06-05.pdf".
   const { uri } = await Print.printToFileAsync({ html });
-  await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Export PDF' });
+  const path = docPath(buildExportFilename(settings, scopeLabel, 'pdf'));
+  try {
+    await FileSystem.copyAsync({ from: uri, to: path });
+    await Sharing.shareAsync(path, { mimeType: 'application/pdf', dialogTitle: 'Export PDF' });
+  } catch {
+    // If the copy fails for any reason, fall back to sharing the temp file.
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Export PDF' });
+  }
 }
 
 // ─── Column alias table ───────────────────────────────────────────────────────
@@ -143,6 +247,10 @@ const ALIASES = {
     'kilometers', 'kms', 'mileage (miles)', 'distance (miles)',
     'distance', 'mileage', 'km', 'miles', 'travel',
   ],
+  job: [
+    'job', 'client', 'employer', 'company', 'position', 'workplace',
+    'work place', 'place of work',
+  ],
   tags: [
     'tags', 'tag', 'categories', 'category', 'labels', 'label', 'type',
   ],
@@ -184,8 +292,8 @@ function parseDateStr(str) {
   str = (str || '').trim();
   if (!str) return null;
 
-  // YYYY-MM-DD
-  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  // YYYY-MM-DD  or  YYYY/MM/DD
+  let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (m) return { year: +m[1], month: +m[2], day: +m[3], hasYear: true };
 
   // MM/DD/YYYY or M/D/YYYY
@@ -227,22 +335,41 @@ function parseDateStr(str) {
 function parseTimeStr(str) {
   str = (str || '').trim();
   if (!str) return null;
+  // Normalise "a.m." / "p.m." → "am"/"pm" and a dot separator "9.00" → "9:00".
+  str = str.replace(/([ap])\.?m\.?/i, '$1m').replace(/^(\d{1,2})\.(\d{2})$/, '$1:$2');
 
-  // 24h: "09:00" "9:00"
-  let m = str.match(/^(\d{1,2}):(\d{2})$/);
-  if (m) {
-    const h = +m[1], min = +m[2];
-    if (h <= 23 && min <= 59) return `${pad2(h)}:${pad2(min)}`;
-  }
-
-  // 12h: "9:00 AM" "9:00AM" "9:00pm"
-  m = str.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  // 12h: "9:00 AM" "9:00AM" "9:00pm" — check before 24h so "12:00 am" maps right.
+  let m = str.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
   if (m) {
     let h = +m[1];
     const min = +m[2];
     const pm = m[3].toLowerCase() === 'pm';
     if (pm && h !== 12) h += 12;
     if (!pm && h === 12) h = 0;
+    if (h <= 23 && min <= 59) return `${pad2(h)}:${pad2(min)}`;
+  }
+
+  // 12h with no minutes: "9 AM" "9pm"
+  m = str.match(/^(\d{1,2})\s*(am|pm)$/i);
+  if (m) {
+    let h = +m[1];
+    const pm = m[2].toLowerCase() === 'pm';
+    if (pm && h !== 12) h += 12;
+    if (!pm && h === 12) h = 0;
+    if (h <= 23) return `${pad2(h)}:00`;
+  }
+
+  // 24h: "09:00" "9:00"
+  m = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) {
+    const h = +m[1], min = +m[2];
+    if (h <= 23 && min <= 59) return `${pad2(h)}:${pad2(min)}`;
+  }
+
+  // Military with no colon: "0900" "1430" "900"
+  m = str.match(/^(\d{1,2})(\d{2})$/);
+  if (m) {
+    const h = +m[1], min = +m[2];
     if (h <= 23 && min <= 59) return `${pad2(h)}:${pad2(min)}`;
   }
 
@@ -309,7 +436,7 @@ function inferYears(parsedDates) {
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 
-function parseCSVRow(line) {
+function parseCSVRow(line, delimiter = ',') {
   const result = [];
   let cur = '';
   let inQ = false;
@@ -318,7 +445,7 @@ function parseCSVRow(line) {
     if (ch === '"') {
       if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
       else inQ = !inQ;
-    } else if ((ch === ',' || ch === '\t') && !inQ) {
+    } else if (ch === delimiter && !inQ) {
       result.push(cur); cur = '';
     } else {
       cur += ch;
@@ -328,11 +455,29 @@ function parseCSVRow(line) {
   return result;
 }
 
-function parseCSVContent(text, existingShifts) {
-  const lines = text.trim().split(/\r?\n/);
+// Pick the delimiter by counting candidates in the header line (outside quotes
+// is approximated well enough by a raw count for a header row).
+function detectDelimiter(headerLine) {
+  const counts = {
+    ',': (headerLine.match(/,/g) || []).length,
+    '\t': (headerLine.match(/\t/g) || []).length,
+    ';': (headerLine.match(/;/g) || []).length,
+  };
+  let best = ',', bestN = -1;
+  for (const d of [',', '\t', ';']) {
+    if (counts[d] > bestN) { best = d; bestN = counts[d]; }
+  }
+  return best;
+}
+
+function parseCSVContent(text, existingShifts, jobs = []) {
+  // Strip a UTF-8 BOM so the first header ("date") still matches.
+  const clean = text.replace(/^﻿/, '').trim();
+  const lines = clean.split(/\r?\n/);
   if (lines.length < 2) throw new Error('File appears empty or has no data rows.');
 
-  const rawHeaders = parseCSVRow(lines[0]);
+  const delimiter = detectDelimiter(lines[0]);
+  const rawHeaders = parseCSVRow(lines[0], delimiter);
   const headers = rawHeaders.map((h) => h.toLowerCase().trim().replace(/^"|"$/g, ''));
 
   const dateIdx   = findCol(headers, 'date');
@@ -347,35 +492,88 @@ function parseCSVContent(text, existingShifts) {
   const tagsIdx    = findCol(headers, 'tags');
   const otIdx      = findCol(headers, 'overtime');
   const mileIdx    = findCol(headers, 'mileage');
+  const jobIdx     = findCol(headers, 'job');
+
+  // Decide once per file whether the break column is in hours or minutes,
+  // based on the header text. We re-check per-value with a magnitude heuristic
+  // because some sources omit the unit in the header entirely.
+  const breakHeaderText = breakIdx >= 0 ? rawHeaders[breakIdx] : '';
+  const headerSaysHours = /\b(hours?|hrs?)\b/i.test(breakHeaderText) && !/\bmin/i.test(breakHeaderText);
 
   const rawRows = [];
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
-    const cols = parseCSVRow(lines[i]);
-    const rawDate = (cols[dateIdx] || '').trim().replace(/^"|"$/g, '');
+    const cols = parseCSVRow(lines[i], delimiter);
+    let rawDate = (cols[dateIdx] || '').trim().replace(/^"|"$/g, '');
     if (!rawDate) continue;
+
+    let start = startIdx >= 0 ? (cols[startIdx] || '').trim() : '';
+    let end   = endIdx   >= 0 ? (cols[endIdx]   || '').trim() : '';
+
+    // Combined "2026-05-08 08:00" in the date cell when there's no Start column.
+    if (!start && /\s/.test(rawDate)) {
+      const parts = rawDate.split(/\s+/);
+      const maybeTime = parts[parts.length - 1];
+      if (parseTimeStr(maybeTime)) { start = maybeTime; rawDate = parts.slice(0, -1).join(' '); }
+    }
+
     rawRows.push({
-      rawDate,
-      start:           startIdx    >= 0 ? cols[startIdx]?.trim()    : '',
-      end:             endIdx      >= 0 ? cols[endIdx]?.trim()      : '',
+      rawDate, start, end,
       notes:           notesIdx    >= 0 ? cols[notesIdx]?.trim()    : '',
-      breakMinutes:    breakIdx    >= 0 ? Number(cols[breakIdx])    || 0 : 0,
+      breakMinutes:    breakIdx    >= 0 ? parseBreakValue(cols[breakIdx], headerSaysHours) : 0,
       breakPaid:       breakPaidIdx>= 0 ? /yes|true|1/i.test(cols[breakPaidIdx] || '') : false,
-      hourlyRate:      rateIdx     >= 0 ? Number(cols[rateIdx])     || 0 : 0,
+      hourlyRate:      rateIdx     >= 0 ? sanitizeNumber(cols[rateIdx]) : 0,
       tags:            tagsIdx     >= 0 ? (cols[tagsIdx] || '').split(',').map((t) => t.trim()).filter(Boolean) : [],
-      overtimeMinutes: otIdx       >= 0 ? Number(cols[otIdx])       || 0 : 0,
-      mileageKm:       mileIdx     >= 0 ? Number(cols[mileIdx])     || 0 : 0,
+      overtimeMinutes: otIdx       >= 0 ? sanitizeNumber(cols[otIdx]) : 0,
+      mileageKm:       mileIdx     >= 0 ? sanitizeNumber(cols[mileIdx]) : 0,
+      jobName:         jobIdx      >= 0 ? (cols[jobIdx] || '').trim() : '',
     });
   }
 
   if (rawRows.length === 0) throw new Error('No data rows found.');
-  return buildShifts(rawRows, existingShifts);
+  return buildShifts(rawRows, existingShifts, jobs);
+}
+
+// Convert an imported break value to minutes.
+//   - If the column header explicitly says "hours/hr" → multiply by 60.
+//   - Otherwise, if the value is < 5, assume it's hours expressed as a decimal
+//     (0.5 → 30 min, 1 → 60 min). Real break columns in minutes never use
+//     values under 5, but external worklog tools commonly use 0.5/1.0/1.5 hrs.
+//   - Otherwise treat as minutes.
+function parseBreakValue(raw, headerSaysHours) {
+  const num = sanitizeNumber(raw);
+  if (num <= 0) return 0;
+  if (headerSaysHours) return Math.round(num * 60);
+  if (num < 5)         return Math.round(num * 60);
+  return Math.round(num);
+}
+
+// Parse a number from a messy imported cell: strips currency symbols / units /
+// thousands separators and copes with decimal comma (European "1.234,50").
+function sanitizeNumber(raw) {
+  if (raw == null) return 0;
+  let s = String(raw).trim().replace(/[^0-9.,\-]/g, '');
+  if (!s) return 0;
+  const hasComma = s.includes(',');
+  const hasDot   = s.includes('.');
+  if (hasComma && hasDot) {
+    // The right-most separator is the decimal point.
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
+    else                                         s = s.replace(/,/g, '');
+  } else if (hasComma) {
+    const parts = s.split(',');
+    // "1,5" → decimal; "1,000" (3-digit groups) → thousands.
+    if (parts.length === 2 && parts[1].length !== 3) s = `${parts[0]}.${parts[1]}`;
+    else                                             s = s.replace(/,/g, '');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
 }
 
 // ─── PDF text extractor ───────────────────────────────────────────────────────
 // Best-effort: reads the raw PDF bytes as UTF-8 text and extracts printable
 // strings from PDF text operators. Works well for text-based PDFs (including
-// those generated by ShiftyLog's own PDF export). Returns null if extraction
+// those generated by ShiftClocker's own PDF export). Returns null if extraction
 // produces nothing recognisable.
 
 function extractPDFStrings(raw) {
@@ -480,9 +678,12 @@ function parsePDFStrings(strings, existingShifts) {
 
 // ─── Shared row → shift builder ───────────────────────────────────────────────
 
-function buildShifts(rawRows, existingShifts) {
+function buildShifts(rawRows, existingShifts, jobs = []) {
   let parsedDates = rawRows.map((r) => parseDateStr(r.rawDate));
   if (parsedDates.some((d) => d && !d.hasYear)) parsedDates = inferYears(parsedDates);
+
+  // Lower-cased job name → job, for matching an imported "Job/Client" column.
+  const jobByName = new Map((jobs || []).map((j) => [String(j.name || '').toLowerCase().trim(), j]));
 
   const existingKeys = new Set((existingShifts || []).map((s) => `${s.date}|${s.start}|${s.end}`));
   const newShifts = [];
@@ -501,16 +702,22 @@ function buildShifts(rawRows, existingShifts) {
     if (existingKeys.has(key)) { skipped++; continue; }
     existingKeys.add(key);
 
+    // Match an imported job/client name to an existing job; if no match, keep
+    // the value as a tag so the information isn't lost.
+    const matchedJob = r.jobName ? jobByName.get(r.jobName.toLowerCase().trim()) : null;
+    const tags = [...(r.tags || [])];
+    if (r.jobName && !matchedJob && !tags.includes(r.jobName)) tags.push(r.jobName);
+
     newShifts.push({
       id: uid(), date: iso, start, end,
-      hourlyRate: r.hourlyRate,
-      jobId: null,
+      hourlyRate: r.hourlyRate || (matchedJob ? Number(matchedJob.hourlyRate) || 0 : 0),
+      jobId: matchedJob ? matchedJob.id : null,
       breakMinutes: r.breakMinutes, breakPaid: r.breakPaid,
       overtimeMinutes: r.overtimeMinutes,
       mileageKm: r.mileageKm,
       tips: 0,
       notes: r.notes,
-      tags: r.tags,
+      tags,
     });
   }
 
@@ -519,7 +726,7 @@ function buildShifts(rawRows, existingShifts) {
 
 // ─── Main import entry point ──────────────────────────────────────────────────
 
-export async function importShifts(existingShifts) {
+export async function importShifts(existingShifts, jobs = []) {
   const result = await DocumentPicker.getDocumentAsync({
     type: ['text/csv', 'text/plain', 'text/tab-separated-values',
            'text/comma-separated-values', 'application/pdf', '*/*'],
@@ -555,5 +762,5 @@ export async function importShifts(existingShifts) {
 
   // CSV / TSV / plain text
   const text = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 });
-  return parseCSVContent(text, existingShifts);
+  return parseCSVContent(text, existingShifts, jobs);
 }

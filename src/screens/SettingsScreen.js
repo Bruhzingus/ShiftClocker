@@ -18,6 +18,8 @@ import { PAY_PERIOD_TYPES, WEEK_START_OPTIONS } from '../utils/periods';
 import { exportBackup, importBackup, BACKUP_FREQUENCIES, formatBackupAge } from '../utils/backup';
 import { exportCSV, exportPDF, importShifts } from '../utils/export';
 import { formatMoney, clampNumber, uid } from '../utils/helpers';
+import { CURRENCY_OPTIONS } from '../utils/currency';
+import { syncDailyReminder } from '../utils/notifications';
 
 // ─── Sub-page header ──────────────────────────────────────────────────────────
 
@@ -312,6 +314,16 @@ export default function SettingsScreen({
   const showToast = (msg, tone = 'success') => setToast({ visible: true, message: msg, tone });
 
   const upd = (key, val) => setSettings((prev) => ({ ...prev, [key]: val }));
+  const updReminders = (patch) => upd('reminders', { ...(settings.reminders || {}), ...patch });
+
+  const toggleReminders = async (v) => {
+    const next = { ...(settings.reminders || {}), enabled: v };
+    upd('reminders', next);
+    if (v) {
+      const ok = await syncDailyReminder(next);
+      if (!ok) showToast('Allow notifications in system settings', 'danger');
+    }
+  };
 
   // ── Jobs state ──
   const jobs = useMemo(() => ensureJobs(settings).jobs, [settings.jobs]);
@@ -386,20 +398,20 @@ export default function SettingsScreen({
   const [busyCSV, setBusyCSV] = useState(null);
   const handleExportCSV = async () => {
     setBusyCSV('exportCSV');
-    try { await exportCSV(shifts, settings); }
+    try { await exportCSV(shifts, settings, 'All time'); }
     catch (err) { showToast(err.message || 'Export failed', 'danger'); }
     finally { setBusyCSV(null); }
   };
   const handleExportPDF = async () => {
     setBusyCSV('exportPDF');
-    try { await exportPDF(shifts, settings); }
+    try { await exportPDF(shifts, settings, '', '', 'All time'); }
     catch (err) { showToast(err.message || 'Export failed', 'danger'); }
     finally { setBusyCSV(null); }
   };
   const handleImport = async () => {
     setBusyCSV('import');
     try {
-      const result = await importShifts(shifts);
+      const result = await importShifts(shifts, settings.jobs || []);
       if (!result) { setBusyCSV(null); return; }
       const { newShifts, added, skipped } = result;
       if (added > 0) {
@@ -446,6 +458,13 @@ export default function SettingsScreen({
             <NavRow icon="options-outline" title="Defaults" subtitle="Rates and multipliers" onPress={() => setSubPage('defaults')} last />
           </SectionCard>
 
+          <Text style={s.groupLabel}>REMINDERS</Text>
+          <SectionCard style={{ padding: 0, overflow: 'hidden' }}>
+            <NavRow icon="notifications-outline" title="Reminders"
+              subtitle={settings.reminders?.enabled ? `Daily at ${settings.reminders.time || '19:00'}` : 'Off'}
+              onPress={() => setSubPage('reminders')} last />
+          </SectionCard>
+
           <Text style={s.groupLabel}>DATA</Text>
           <SectionCard style={{ padding: 0, overflow: 'hidden' }}>
             <NavRow icon="document-text-outline" title="Shifts Data" subtitle="Import / Export CSV or PDF" onPress={() => setSubPage('data')} />
@@ -458,7 +477,7 @@ export default function SettingsScreen({
             <NavRow icon="warning-outline" title="Danger Zone" onPress={() => setSubPage('danger')} danger last />
           </SectionCard>
 
-          <Text style={s.footer}>ShiftyLog · data stored on this device</Text>
+          <Text style={s.footer}>ShiftClocker · data stored on this device</Text>
           <View style={{ height: 24 }} />
         </ScrollView>
 
@@ -686,11 +705,22 @@ export default function SettingsScreen({
 
   // ── Defaults ──
   if (subPage === 'defaults') {
-    const hasContent = settings.trackOvertime || settings.trackMileage;
     return (
       <ScreenContainer>
         <SubHeader title="Defaults" onBack={goRoot} />
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+          {settings.showWage && (
+            <Field label="Currency" hint="symbol used app-wide and in exports">
+              <Dropdown value={settings.currency || '$'} options={CURRENCY_OPTIONS}
+                onChange={(v) => upd('currency', v)} />
+            </Field>
+          )}
+          {settings.showWage && (
+            <Field label="Default hourly rate" hint="for new jobs / fallback">
+              <NumInput value={settings.defaultHourlyRate ?? 0}
+                onChangeText={(v) => upd('defaultHourlyRate', clampNumber(v, { max: 100000 }))} placeholder="0.00" />
+            </Field>
+          )}
           {settings.trackOvertime && (
             <Field label="Overtime multiplier" hint="× regular rate">
               <NumInput value={settings.overtimeMultiplier ?? 1.5}
@@ -698,14 +728,17 @@ export default function SettingsScreen({
             </Field>
           )}
           {settings.trackMileage && (
-            <Field label="Mileage rate" hint="$ per km">
+            <Field label="Mileage rate" hint="per km">
               <NumInput value={settings.mileageRate ?? 0}
                 onChangeText={(v) => upd('mileageRate', clampNumber(v, { max: 100 }))} placeholder="0.00" />
             </Field>
           )}
-          {!hasContent && (
-            <Text style={s.subhint}>Enable Overtime or Mileage in Tracking to configure defaults.</Text>
-          )}
+          <View style={{ height: 4 }} />
+          <Text style={s.groupLabel}>EXPORTS</Text>
+          <Field label="Name on reports" hint="optional — shown on CSV/PDF + in the filename">
+            <StyledInput value={settings.reportName || ''} maxLength={40}
+              onChangeText={(v) => upd('reportName', v)} placeholder="e.g. your name or employer" />
+          </Field>
         </ScrollView>
       </ScreenContainer>
     );
@@ -779,6 +812,37 @@ export default function SettingsScreen({
         <ConfirmDialog open={confirmRestore} title="Restore from backup?"
           message="Replaces all current data with the backup. This cannot be undone."
           confirmLabel="Choose file" danger onConfirm={handleRestore} onCancel={() => setConfirmRestore(false)} />
+        <Toast visible={toast.visible} message={toast.message} tone={toast.tone}
+          icon={toast.tone === 'danger' ? 'alert-circle' : 'checkmark-circle'}
+          onHide={() => setToast({ visible: false, message: '' })} />
+      </ScreenContainer>
+    );
+  }
+
+  // ── Reminders ──
+  if (subPage === 'reminders') {
+    const r = settings.reminders || {};
+    return (
+      <ScreenContainer>
+        <SubHeader title="Reminders" onBack={goRoot} />
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+          <Text style={s.subhint}>
+            Local reminders only — nothing leaves your device. You may be asked to allow notifications.
+          </Text>
+          <SectionCard style={{ gap: 0 }}>
+            <Toggle checked={!!r.enabled} onChange={toggleReminders}
+              label="Daily reminder" hint="A nudge to log the day's shift" />
+          </SectionCard>
+          {r.enabled && (
+            <>
+              <TimeField label="Remind me at" value={r.time || '19:00'} onChange={(v) => updReminders({ time: v })} />
+              <Field label="Clock-out reminder (hours)" hint="0 = off — alerts if still clocked in this long">
+                <NumInput value={r.clockOutReminderHours ?? 0}
+                  onChangeText={(v) => updReminders({ clockOutReminderHours: clampNumber(v, { max: 24 }) })} placeholder="0" />
+              </Field>
+            </>
+          )}
+        </ScrollView>
         <Toast visible={toast.visible} message={toast.message} tone={toast.tone}
           icon={toast.tone === 'danger' ? 'alert-circle' : 'checkmark-circle'}
           onHide={() => setToast({ visible: false, message: '' })} />

@@ -2,6 +2,25 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Animated, Easing, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useStyles } from '../theme/ThemeContext';
+import { notifySuccess, notifyWarning } from '../utils/haptics';
+
+// AnimatedCount — count-up/down between values, rendered through a formatter.
+// Used for the summary totals so numbers "roll" when the period/filter changes.
+export function AnimatedCount({ value, format = (n) => String(Math.round(n)), duration = 500, style }) {
+  const anim = useRef(new Animated.Value(value || 0)).current;
+  const [display, setDisplay] = useState(value || 0);
+
+  useEffect(() => {
+    const id = anim.addListener(({ value: v }) => setDisplay(v));
+    Animated.timing(anim, {
+      toValue: value || 0, duration,
+      easing: Easing.out(Easing.cubic), useNativeDriver: false,
+    }).start();
+    return () => anim.removeListener(id);
+  }, [value]);
+
+  return <Text style={style}>{format(display)}</Text>;
+}
 
 // FadeIn — mounts children with a fade + small upward translate.
 // Usage: <FadeIn delay={100}>{...}</FadeIn>
@@ -45,6 +64,7 @@ export function Toast({ visible, message, icon = 'checkmark-circle', tone = 'suc
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      if (tone === 'danger') notifyWarning(); else notifySuccess();
       Animated.parallel([
         Animated.spring(opacity, { toValue: 1, useNativeDriver: true, friction: 8, tension: 90 }),
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, friction: 8, tension: 90 }),

@@ -15,7 +15,12 @@ export const BACKUP_KEYS = [
   'sl.theme.v1',
 ];
 
-const BACKUP_FORMAT = 'shiftylog-backup';
+const BACKUP_FORMAT = 'shiftclocker-backup';
+// Legacy tag/prefix from the ShiftyLog era — still accepted on import and when
+// pruning old auto-backups so a rename never strands a user's existing backups.
+const LEGACY_BACKUP_FORMAT = 'shiftylog-backup';
+const BACKUP_FILE_PREFIX = 'shiftclocker-backup-';
+const LEGACY_FILE_PREFIX = 'shiftylog-backup-';
 const BACKUP_VERSION = 1;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -57,7 +62,9 @@ async function snapshot() {
 // file or a corrupted download.
 function validateBackup(parsed) {
   if (!parsed || typeof parsed !== 'object') return 'File is not valid JSON.';
-  if (parsed.format !== BACKUP_FORMAT) return 'This file is not a ShiftyLog backup.';
+  if (parsed.format !== BACKUP_FORMAT && parsed.format !== LEGACY_BACKUP_FORMAT) {
+    return 'This file is not a ShiftClocker backup.';
+  }
   if (typeof parsed.version !== 'number') return 'Backup is missing a version number.';
   if (parsed.version > BACKUP_VERSION) return 'Backup was created by a newer app version. Update first.';
   if (!parsed.data || typeof parsed.data !== 'object') return 'Backup is missing its data block.';
@@ -80,7 +87,7 @@ function backupDir() {
 export async function writeBackupFile() {
   const blob = await snapshot();
   const json = JSON.stringify(blob, null, 2);
-  const filename = `shiftylog-backup-${todayISO()}-${Date.now()}.json`;
+  const filename = `${BACKUP_FILE_PREFIX}${todayISO()}-${Date.now()}.json`;
   const dir = backupDir();
   if (!dir) throw new Error('No writable directory available on this device.');
   const path = `${dir}${filename}`;
@@ -95,7 +102,7 @@ export async function exportBackup() {
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(path, {
       mimeType: 'application/json',
-      dialogTitle: 'Save ShiftyLog backup',
+      dialogTitle: 'Save ShiftClocker backup',
       UTI: 'public.json',
     });
   }
@@ -114,7 +121,7 @@ export async function runAutoBackup({ keepCount = 5 } = {}) {
     if (dir) {
       const files = await FileSystem.readDirectoryAsync(dir);
       const ours = files
-        .filter((f) => f.startsWith('shiftylog-backup-') && f.endsWith('.json'))
+        .filter((f) => (f.startsWith(BACKUP_FILE_PREFIX) || f.startsWith(LEGACY_FILE_PREFIX)) && f.endsWith('.json'))
         .sort()
         .reverse();
       const stale = ours.slice(keepCount);

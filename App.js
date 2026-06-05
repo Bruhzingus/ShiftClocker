@@ -7,10 +7,13 @@ import { useAsyncStorage, clearAllStorage } from './src/utils/storage';
 import { seedShifts, seedQuickShifts, DEFAULT_SETTINGS } from './src/utils/helpers';
 import { ensureJobs } from './src/utils/jobs';
 import { runAutoBackup, shouldAutoBackup } from './src/utils/backup';
-import { THEMES, DEFAULT_THEME_ID } from './src/theme/themes';
+import { setCurrencySymbol } from './src/utils/currency';
+import { syncDailyReminder } from './src/utils/notifications';
+import { THEMES, DEFAULT_THEME_ID, THEME_LIST } from './src/theme/themes';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import MainScreen from './src/screens/MainScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import StatsScreen from './src/screens/StatsScreen';
 
 export default function App() {
   const [shifts, setShifts, shiftsLoaded] = useAsyncStorage('sl.shifts.v1', seedShifts);
@@ -18,15 +21,21 @@ export default function App() {
   const [settings, setSettings, stLoaded] = useAsyncStorage('sl.settings.v1', DEFAULT_SETTINGS);
   const [sortBy, setSortBy, sortLoaded] = useAsyncStorage('sl.sort.v1', 'date-asc');
   const [themeId, setThemeId, themeLoaded] = useAsyncStorage('sl.theme.v1', DEFAULT_THEME_ID);
+  const [activeClock, setActiveClock] = useAsyncStorage('sl.activeClock.v1', null);
   const [view, setView] = useState('main');
   const [, setReloadKey] = useState(0);
   const [exitConfirm, setExitConfirm] = useState(false);
 
   const loaded = shiftsLoaded && qsLoaded && stLoaded && sortLoaded && themeLoaded;
 
+  // Push the chosen currency symbol into the formatting layer synchronously so
+  // formatMoney() renders the right symbol on the very first paint (and updates
+  // immediately when the user changes it in Settings).
+  setCurrencySymbol(settings.currency);
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (view === 'settings') {
+      if (view !== 'main') {
         setView('main');
         return true;
       }
@@ -100,6 +109,13 @@ export default function App() {
     })();
   }, [loaded]);
 
+  // Keep the daily reminder in sync with the setting (best-effort; ignore errors
+  // so a notifications failure never blocks the app).
+  useEffect(() => {
+    if (!loaded) return;
+    syncDailyReminder(settings.reminders).catch(() => {});
+  }, [loaded, settings.reminders?.enabled, settings.reminders?.time]);
+
   const resetAll = async () => {
     await clearAllStorage();
     setShifts(seedShifts());
@@ -107,6 +123,7 @@ export default function App() {
     setSettings(DEFAULT_SETTINGS);
     setSortBy('date-desc');
     setThemeId(DEFAULT_THEME_ID);
+    setActiveClock(null);
     setView('main');
   };
 
@@ -133,17 +150,16 @@ export default function App() {
   }, []);
 
   const palette = THEMES[themeId] || THEMES[DEFAULT_THEME_ID];
+  const isLight = THEME_LIST.find((t) => t.id === themeId)?.isLight ?? false;
 
   if (!loaded) {
     return (
       <View style={[s.loading, { backgroundColor: palette.bg }]}>
-        <StatusBar barStyle={palette.bg === '#fbf7f0' ? 'dark-content' : 'light-content'} backgroundColor={palette.bg} />
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={palette.bg} />
         <ActivityIndicator color={palette.accent} size="large" />
       </View>
     );
   }
-
-  const isLight = themeId === 'solar';
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -163,6 +179,12 @@ export default function App() {
             onResetAll={resetAll}
             onAfterRestore={reloadFromStorage}
           />
+        ) : view === 'stats' ? (
+          <StatsScreen
+            shifts={shifts}
+            settings={settings}
+            onBack={() => setView('main')}
+          />
         ) : (
           <MainScreen
             shifts={shifts}
@@ -170,12 +192,15 @@ export default function App() {
             quickShifts={quickShifts}
             settings={settings}
             setSettings={setSettings}
+            activeClock={activeClock}
+            setActiveClock={setActiveClock}
             onOpenSettings={() => setView('settings')}
+            onOpenStats={() => setView('stats')}
           />
         )}
         <ConfirmDialog
           open={exitConfirm}
-          title="Exit ShiftyLog?"
+          title="Exit ShiftClocker?"
           message="Your data is saved automatically."
           confirmLabel="Exit"
           onConfirm={() => BackHandler.exitApp()}

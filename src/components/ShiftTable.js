@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, Pressable, ScrollView, StyleSheet,
+  View, Text, Pressable, ScrollView, FlatList, StyleSheet,
   Modal, Animated, Easing, Platform, useWindowDimensions,
+  LayoutAnimation, UIManager,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +12,12 @@ import { computeShift } from '../utils/calculations';
 import { formatDateMed, formatHM, formatMoney } from '../utils/helpers';
 import { findJob } from '../utils/jobs';
 import BulkEditModal from './BulkEditModal';
+
+// LayoutAnimation needs an explicit opt-in on Android (old architecture). Safe
+// no-op on the new architecture / iOS.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ─── Column widths ────────────────────────────────────────────────────────────
 
@@ -381,8 +388,10 @@ export default function ShiftTable({
   // Note popup
   const [openNote, setOpenNote] = useState(null);
 
-  // Column sort — single-column, cycles through states
-  const [sortCol, setSortCol] = useState(null);
+  // Column sort — single-column, cycles through states.
+  // Default to date ASC so the table is always chronological even when shifts
+  // were entered/imported out of order.
+  const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState('asc');
 
   const cycleSort = useCallback((col) => {
@@ -404,13 +413,15 @@ export default function ShiftTable({
     }
   }, [sortCol, sortDir]);
 
-  // Apply sort after filtering
+  // Apply sort after filtering. When sortCol is cleared (cycled to null),
+  // fall back to date ASC so we never display in raw insertion order.
   const sortedShifts = useMemo(() => {
-    if (!sortCol) return shifts;
+    const effCol = sortCol || 'date';
+    const effDir = sortCol ? sortDir : 'asc';
     const pre = shifts.map((sh) => ({ sh, c: computeShift(sh, settings) }));
     pre.sort(({ sh: a, c: ca }, { sh: b, c: cb }) => {
       let cmp = 0;
-      switch (sortCol) {
+      switch (effCol) {
         case 'date':  cmp = (a.date + a.start).localeCompare(b.date + b.start); break;
         case 'hours': cmp = ca.paidMinutes - cb.paidMinutes; break;
         case 'break': cmp = (a.breakMinutes || 0) - (b.breakMinutes || 0); break;
@@ -424,10 +435,21 @@ export default function ShiftTable({
         }
         case 'notes': cmp = (a.notes?.length || 0) - (b.notes?.length || 0); break;
       }
-      return sortDir === 'asc' ? cmp : -cmp;
+      return effDir === 'asc' ? cmp : -cmp;
     });
     return pre.map(({ sh }) => sh);
   }, [shifts, sortCol, sortDir, settings]);
+
+  // Smoothly animate height when rows are added/removed (add shift, delete, filter).
+  const prevCountRef = useRef(sortedShifts.length);
+  useEffect(() => {
+    if (prevCountRef.current !== sortedShifts.length) {
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(180, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
+      );
+      prevCountRef.current = sortedShifts.length;
+    }
+  }, [sortedShifts.length]);
 
   // ── Slide-in animation when the period changes ────────────────────────────
   const { width: screenWidth } = useWindowDimensions();
@@ -586,29 +608,33 @@ export default function ShiftTable({
               sortDir={sortDir}
               onHeaderPress={cycleSort}
             />
-            <ScrollView
+            <FlatList
+              data={sortedShifts}
+              keyExtractor={(item) => item.id}
               style={{ flex: 1 }}
               showsVerticalScrollIndicator
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
-            >
-              {sortedShifts.map((shift, idx) => (
+              removeClippedSubviews
+              initialNumToRender={20}
+              windowSize={11}
+              maxToRenderPerBatch={20}
+              ListFooterComponent={<View style={{ height: 8 }} />}
+              renderItem={({ item, index }) => (
                 <ShiftRow
-                  key={shift.id}
-                  shift={shift}
+                  shift={item}
                   settings={settings}
                   selectionMode={selectionMode}
-                  selected={selectedIds.has(shift.id)}
-                  index={idx}
-                  onSelectToggle={() => toggleSelect(shift.id)}
-                  onLongPress={() => { if (!selectionMode) enterSelection(shift.id); }}
-                  onNoteOpen={() => setOpenNote(shift)}
+                  selected={selectedIds.has(item.id)}
+                  index={index}
+                  onSelectToggle={() => toggleSelect(item.id)}
+                  onLongPress={() => { if (!selectionMode) enterSelection(item.id); }}
+                  onNoteOpen={() => setOpenNote(item)}
                   hasJobs={hasJobs}
                   hasTipsJobs={hasTipsJobs}
                 />
-              ))}
-              <View style={{ height: 8 }} />
-            </ScrollView>
+              )}
+            />
           </View>
         </ScrollView>
       </Animated.View>
